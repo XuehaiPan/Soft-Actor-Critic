@@ -103,17 +103,20 @@ class Trainer(OriginTrainer):
 
     def update(self, batch_size, reward_scale=1.0, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
-        trajectory_list_state, trajectory_list_action, trajectory_list_reward, \
-        trajectory_list_next_state, trajectory_list_done = self.replay_buffer.sample(batch_size)
+        # size: (batch, seq_len, item_size)
+        batch_trajectory_state, batch_trajectory_action, batch_trajectory_reward, \
+        batch_trajectory_next_state, batch_trajectory_done = self.replay_buffer.sample(batch_size)
 
-        first_state = torch.stack(list(next(zip(*trajectory_list_state)))).unsqueeze(dim=0).to(self.device)
-        first_action = torch.stack(list(next(zip(*trajectory_list_action)))).unsqueeze(dim=0).to(self.device)
+        # size: (batch, 1, item_size)
+        first_state = torch.stack(list(next(zip(*batch_trajectory_state)))).unsqueeze(dim=0).to(self.device)
+        first_action = torch.stack(list(next(zip(*batch_trajectory_action)))).unsqueeze(dim=0).to(self.device)
 
-        state = pad_sequence(trajectory_list_state).to(self.device)
-        next_state = pad_sequence(trajectory_list_next_state).to(self.device)
-        action = pad_sequence(trajectory_list_action).to(self.device)
-        reward = pad_sequence(trajectory_list_reward).to(self.device)
-        done = pad_sequence(trajectory_list_done).to(self.device)
+        # size: (seq_len, batch, item_size)
+        state = pad_sequence(batch_trajectory_state).to(self.device)
+        next_state = pad_sequence(batch_trajectory_next_state).to(self.device)
+        action = pad_sequence(batch_trajectory_action).to(self.device)
+        reward = pad_sequence(batch_trajectory_reward).to(self.device)
+        done = pad_sequence(batch_trajectory_done).to(self.device)
 
         predicted_q_value_1, _ = self.soft_q_net_1(state, action, None)
         predicted_q_value_2, _ = self.soft_q_net_2(state, action, None)

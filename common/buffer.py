@@ -14,6 +14,9 @@ class ReplayBuffer(object):
 
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
+
+        # size: (batch, item_size)
+        # state, action, reward, next_state, done
         return tuple(map(torch.FloatTensor, map(np.stack, zip(*batch))))
 
     def __len__(self):
@@ -30,4 +33,7 @@ class ReplayBuffer(object):
 class TrajectoryReplayBuffer(ReplayBuffer):
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
+
+        # size: (batch, seq_len, item_size)
+        # batch_trajectory_{state, action, reward, next_state, done}
         return tuple(map(lambda item_list: list(map(torch.FloatTensor, item_list)), zip(*batch)))

@@ -95,6 +95,7 @@ class Trainer(object):
 
     def update(self, batch_size, reward_scale=1.0, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
+        # size: (batch, item_size)
         state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
                                                             self.replay_buffer.sample(batch_size)))
 
