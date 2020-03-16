@@ -110,7 +110,7 @@ def main():
         trainer.load_model(path=INITIAL_CHECKPOINT)
 
     if INITIAL_EPOCH < TOTAL_EPOCHS:
-        while len(trainer.replay_buffer) < BATCH_SIZE - 1:
+        while trainer.replay_buffer.size < BATCH_SIZE - 1:
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_steps=MAX_STEPS,
                                deterministic=DETERMINISTIC,

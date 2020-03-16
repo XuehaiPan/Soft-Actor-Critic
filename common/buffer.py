@@ -29,6 +29,10 @@ class ReplayBuffer(object):
         else:
             return self.buffer.maxlen
 
+    @property
+    def size(self):
+        return len(self.buffer)
+
 
 class TrajectoryReplayBuffer(ReplayBuffer):
     def sample(self, batch_size):
