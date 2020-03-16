@@ -96,6 +96,7 @@ class Trainer(OriginTrainer):
                 self.episode_steps.append(episode_step)
                 self.total_steps += episode_step
                 self.writer.add_scalar(tag='sample/rewards', scalar_value=episode_reward, global_step=self.n_episodes)
+                self.writer.add_scalar(tag='sample/average_reward', scalar_value=episode_reward / episode_step, global_step=self.n_episodes)
                 self.writer.add_scalar(tag='sample/steps', scalar_value=episode_step, global_step=self.n_episodes)
 
                 pbar.set_postfix({'buffer_size': len(self.replay_buffer)})
