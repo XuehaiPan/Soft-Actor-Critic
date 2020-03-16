@@ -30,10 +30,13 @@ class Trainer(object):
         self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
         self.target_soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
         self.target_soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
-        self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
-        self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
 
         self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
+        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
+
+        self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
+        self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
+        self.target_policy_net.load_state_dict(self.policy_net.state_dict())
 
         self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, requires_grad=True, device=device))
 
@@ -43,6 +46,7 @@ class Trainer(object):
             'target_soft_q_net_1': self.target_soft_q_net_1,
             'target_soft_q_net_2': self.target_soft_q_net_2,
             'policy_net': self.policy_net,
+            'target_policy_net': self.target_policy_net,
             'params': nn.ParameterDict({'log_alpha': self.log_alpha})
         })
 
@@ -105,7 +109,6 @@ class Trainer(object):
         predicted_q_value_1 = self.soft_q_net_1(state, action)
         predicted_q_value_2 = self.soft_q_net_2(state, action)
         new_action, log_prob = self.policy_net.evaluate(state)
-        new_next_action, next_log_prob = self.policy_net.evaluate(next_state)
         reward = reward_scale * (reward - reward.mean(dim=0)) / (reward.std(dim=0) + epsilon)
         if auto_entropy is True:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
@@ -118,6 +121,8 @@ class Trainer(object):
 
         # Training Q Function
         with torch.no_grad():
+            new_next_action, next_log_prob = self.target_policy_net.evaluate(next_state)
+
             target_q_min = torch.min(self.target_soft_q_net_1(next_state, new_next_action),
                                      self.target_soft_q_net_2(next_state, new_next_action)) \
                            - alpha * next_log_prob
@@ -143,6 +148,8 @@ class Trainer(object):
         for target_param, param in zip(self.target_soft_q_net_1.parameters(), self.soft_q_net_1.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
         for target_param, param in zip(self.target_soft_q_net_2.parameters(), self.soft_q_net_2.parameters()):
+            target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
+        for target_param, param in zip(self.target_policy_net.parameters(), self.policy_net.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
         return q_value_loss_1.item(), q_value_loss_2.item(), policy_loss.item()
 
