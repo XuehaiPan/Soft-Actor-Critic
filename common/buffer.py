@@ -27,7 +27,7 @@ class ReplayBuffer(object):
             return self.buffer.maxlen
 
 
-class RNNReplayBuffer(ReplayBuffer):
+class TrajectoryReplayBuffer(ReplayBuffer):
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
         return tuple(map(lambda item_list: list(map(torch.FloatTensor, item_list)), zip(*batch)))

@@ -8,7 +8,7 @@ import torch.optim as optim
 import tqdm
 from torch.nn.utils.rnn import pad_sequence
 
-from common.buffer import RNNReplayBuffer
+from common.buffer import TrajectoryReplayBuffer
 from sac.rnn.network import SoftQNetwork, PolicyNetwork
 from sac.trainer import Trainer as OriginTrainer
 
@@ -20,7 +20,7 @@ class Trainer(OriginTrainer):
                  buffer_capacity, writer, device):
         self.env = env
         self.device = device
-        self.replay_buffer = RNNReplayBuffer(capacity=buffer_capacity)
+        self.replay_buffer = TrajectoryReplayBuffer(capacity=buffer_capacity)
         self.n_episodes = 0
         self.episode_steps = []
         self.total_steps = 0
