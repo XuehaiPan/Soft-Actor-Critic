@@ -40,17 +40,12 @@ class Trainer(OriginTrainer):
         self.target_soft_q_net_2 = SoftQNetwork(state_dim, action_dim,
                                                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                                                 activation=F.relu, device=device)
+        self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
+        self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
 
         self.policy_net = PolicyNetwork(state_dim, action_dim,
                                         hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                                         activation=F.relu, device=device)
-        self.target_policy_net = PolicyNetwork(state_dim, action_dim,
-                                               hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
-                                               activation=F.relu, device=device)
-
-        self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
-        self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
-        self.target_policy_net.load_state_dict(self.target_policy_net.state_dict())
 
         self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, requires_grad=True, device=device))
 
@@ -60,7 +55,6 @@ class Trainer(OriginTrainer):
             'target_soft_q_net_1': self.target_soft_q_net_1,
             'target_soft_q_net_2': self.target_soft_q_net_2,
             'policy_net': self.policy_net,
-            'target_policy_net': self.target_policy_net,
             'params': nn.ParameterDict({'log_alpha': self.log_alpha})
         })
 
@@ -134,8 +128,8 @@ class Trainer(OriginTrainer):
 
             # Training Q Function
             with torch.no_grad():
-                _, _, policy_net_second_state_hidden = self.target_policy_net.evaluate(first_state, None)
-                new_next_action, next_log_prob, _ = self.target_policy_net.evaluate(next_state, policy_net_second_state_hidden)
+                _, _, policy_net_second_state_hidden = self.policy_net.evaluate(first_state, None)
+                new_next_action, next_log_prob, _ = self.policy_net.evaluate(next_state, policy_net_second_state_hidden)
 
                 _, target_soft_q_net_1_second_state_hidden = self.target_soft_q_net_1(first_state, first_action, None)
                 _, target_soft_q_net_2_second_state_hidden = self.target_soft_q_net_2(first_state, first_action, None)
@@ -165,7 +159,5 @@ class Trainer(OriginTrainer):
             for target_param, param in zip(self.target_soft_q_net_1.parameters(), self.soft_q_net_1.parameters()):
                 target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
             for target_param, param in zip(self.target_soft_q_net_2.parameters(), self.soft_q_net_2.parameters()):
-                target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
-            for target_param, param in zip(self.target_policy_net.parameters(), self.policy_net.parameters()):
                 target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
             return q_value_loss_1.item(), q_value_loss_2.item(), policy_loss.item()
