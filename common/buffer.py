@@ -25,3 +25,12 @@ class ReplayBuffer(object):
             return np.inf
         else:
             return self.buffer.maxlen
+
+
+class RNNReplayBuffer(ReplayBuffer):
+    def push(self, trajectory):
+        self.buffer.append(trajectory)
+
+    def sample(self, batch_size):
+        batch = random.sample(self.buffer, batch_size)
+        return batch
