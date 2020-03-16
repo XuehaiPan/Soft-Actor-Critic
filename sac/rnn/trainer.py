@@ -95,7 +95,7 @@ class Trainer(OriginTrainer):
                 self.n_episodes += 1
                 self.episode_steps.append(episode_step)
                 self.total_steps += episode_step
-                self.writer.add_scalar(tag='sample/rewards', scalar_value=episode_reward, global_step=self.n_episodes)
+                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.n_episodes)
                 self.writer.add_scalar(tag='sample/average_reward', scalar_value=episode_reward / episode_step, global_step=self.n_episodes)
                 self.writer.add_scalar(tag='sample/steps', scalar_value=episode_step, global_step=self.n_episodes)
 
@@ -118,10 +118,11 @@ class Trainer(OriginTrainer):
         reward = pad_sequence(batch_trajectory_reward).to(self.device)
         done = pad_sequence(batch_trajectory_done).to(self.device)
 
-        predicted_q_value_1, _ = self.soft_q_net_1(state, action, None)
-        predicted_q_value_2, _ = self.soft_q_net_2(state, action, None)
-        new_action, log_prob, _ = self.policy_net.evaluate(state, None)
+        # Normalize rewards
         reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
+
+        # Update temperature parameter
+        new_action, log_prob, _ = self.policy_net.evaluate(state, None)
         if auto_entropy is True:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
@@ -131,7 +132,9 @@ class Trainer(OriginTrainer):
         else:
             alpha = 1.0
 
-        # Training Q Function
+        # Training Q function
+        predicted_q_value_1, _ = self.soft_q_net_1(state, action, None)
+        predicted_q_value_2, _ = self.soft_q_net_2(state, action, None)
         with torch.no_grad():
             _, _, policy_net_second_state_hidden = self.policy_net.evaluate(first_state, None)
             new_next_action, next_log_prob, _ = self.policy_net.evaluate(next_state, policy_net_second_state_hidden)
@@ -151,7 +154,7 @@ class Trainer(OriginTrainer):
         q_value_loss_2.backward()
         self.soft_q_optimizer.step()
 
-        # Training Policy Function
+        # Training policy function
         predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action, None)[0],
                                           self.soft_q_net_2(state, new_action, None)[0])
         policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
