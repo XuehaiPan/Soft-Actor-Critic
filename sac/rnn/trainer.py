@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
+from torch.nn.utils.rnn import pad_sequence
 
 from common.buffer import RNNReplayBuffer
 from sac.rnn.network import SoftQNetwork, PolicyNetwork
@@ -83,7 +84,7 @@ class Trainer(OriginTrainer):
 
                     episode_reward += reward
                     episode_step += 1
-                    trajectory.append((state, action, reward, next_state, done))
+                    trajectory.append((state, action, [reward], next_state, [done]))
                     state = next_state
                     if done:
                         pbar.update(max_steps - step)
@@ -101,16 +102,17 @@ class Trainer(OriginTrainer):
 
     def update(self, batch_size, reward_scale=1.0, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
-        state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
+        trajectory_list_state, trajectory_list_action, trajectory_list_reward, \
+        trajectory_list_next_state, trajectory_list_done = self.replay_buffer.sample(batch_size)
 
-        state = torch.FloatTensor(state).to(self.device)
-        next_state = torch.FloatTensor(next_state).to(self.device)
-        action = torch.FloatTensor(action).to(self.device)
-        reward = torch.FloatTensor(reward).unsqueeze(dim=2).to(self.device)
-        done = torch.FloatTensor(done).unsqueeze(dim=2).to(self.device)
+        first_state = torch.stack(list(next(zip(*trajectory_list_state)))).unsqueeze(dim=0).to(self.device)
+        first_action = torch.stack(list(next(zip(*trajectory_list_action)))).unsqueeze(dim=0).to(self.device)
 
-        first_state = state[0].unsqueeze(dim=0)
-        first_action = action[0].unsqueeze(dim=0)
+        state = pad_sequence(trajectory_list_state).to(self.device)
+        next_state = pad_sequence(trajectory_list_next_state).to(self.device)
+        action = pad_sequence(trajectory_list_action).to(self.device)
+        reward = pad_sequence(trajectory_list_reward).to(self.device)
+        done = pad_sequence(trajectory_list_done).to(self.device)
 
         predicted_q_value_1, _ = self.soft_q_net_1(state, action, None)
         predicted_q_value_2, _ = self.soft_q_net_2(state, action, None)

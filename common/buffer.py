@@ -3,7 +3,6 @@ from collections import deque
 
 import numpy as np
 import torch
-from torch.nn.utils.rnn import pad_sequence
 
 
 class ReplayBuffer(object):
@@ -31,4 +30,4 @@ class ReplayBuffer(object):
 class RNNReplayBuffer(ReplayBuffer):
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
-        return tuple(map(pad_sequence, map(torch.FloatTensor, zip(*batch))))
+        return tuple(map(lambda item_list: list(map(torch.FloatTensor, item_list)), zip(*batch)))

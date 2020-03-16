@@ -77,7 +77,7 @@ class Trainer(object):
 
                     episode_reward += reward
                     episode_step += 1
-                    self.replay_buffer.push(state, action, reward, next_state, done)
+                    self.replay_buffer.push(state, action, [reward], next_state, [done])
                     state = next_state
                     if done:
                         pbar.update(max_steps - step)
@@ -94,13 +94,8 @@ class Trainer(object):
 
     def update(self, batch_size, reward_scale=1.0, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
-        state, action, reward, next_state, done = self.replay_buffer.sample(batch_size)
-
-        state = torch.FloatTensor(state).to(self.device)
-        next_state = torch.FloatTensor(next_state).to(self.device)
-        action = torch.FloatTensor(action).to(self.device)
-        reward = torch.FloatTensor(reward).unsqueeze(dim=1).to(self.device)
-        done = torch.FloatTensor(done).unsqueeze(dim=1).to(self.device)
+        state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
+                                                            self.replay_buffer.sample(batch_size)))
 
         predicted_q_value_1 = self.soft_q_net_1(state, action)
         predicted_q_value_2 = self.soft_q_net_2(state, action)
