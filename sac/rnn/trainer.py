@@ -122,7 +122,7 @@ class Trainer(OriginTrainer):
             predicted_q_value_1, _ = self.soft_q_net_1(state, action, None)
             predicted_q_value_2, _ = self.soft_q_net_2(state, action, None)
             new_action, log_prob, _ = self.policy_net.evaluate(state, None)
-            reward = reward_scale * (reward - reward.mean(dim=0)) / (reward.std(dim=0) + epsilon)
+            reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
             if auto_entropy is True:
                 alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
                 self.alpha_optimizer.zero_grad()
