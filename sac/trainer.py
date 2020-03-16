@@ -58,6 +58,7 @@ class Trainer(object):
         print(f'env = {self.env}')
         print(f'state_dim = {self.state_dim}')
         print(f'action_dim = {self.action_dim}')
+        print(f'device = {self.device}')
         print(f'buffer_capacity = {self.replay_buffer.capacity}')
         print('Modules:', self.modules)
 

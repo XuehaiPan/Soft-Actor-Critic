@@ -15,6 +15,8 @@ from common.environment import NormalizedActions
 from sac.rnn.trainer import Trainer
 
 
+ALGORITHM_NAME = 'SAC-LSTM'
+
 ENV_NAME = 'Pendulum-v0'
 ENV = NormalizedActions(gym.make(ENV_NAME))
 MAX_STEPS = 200
@@ -30,30 +32,28 @@ LEARNING_RATE = 1E-3
 WEIGHT_DECAY = 1E-4
 BUFFER_CAPACITY = 100000
 
-RANDOM_SEED = 0
-
 GPU = True
 DEVICE_IDX = 0
+LOAD_CHECKPOINT = False
+RANDOM_SEED = 0
+
 if GPU:
     DEVICE = torch.device(f'cuda:{DEVICE_IDX}' if torch.cuda.is_available() else 'cpu')
 else:
     DEVICE = torch.device('cpu')
-print(DEVICE)
 
-LOAD_CHECKPOINT = False
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LOG_DIR_ROOT = os.path.join(ROOT_DIR, 'logs', ENV_NAME)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_DIR_ROOT = os.path.join(ROOT_DIR, 'logs', ENV_NAME, ALGORITHM_NAME)
 CURRENT_TIME = datetime.now().strftime('%Y-%m-%d-%T')
 LOG_DIR = os.path.join(LOG_DIR_ROOT, CURRENT_TIME)
-CHECKPOINT_DIR = os.path.join(ROOT_DIR, 'checkpoints', ENV_NAME)
+CHECKPOINT_DIR = os.path.join(ROOT_DIR, 'checkpoints', ENV_NAME, ALGORITHM_NAME)
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 os.system(f'ln -sfn {CURRENT_TIME} {os.path.join(LOG_DIR_ROOT, "latest")}')
 
 CHECKPOINT_REGEX = re.compile(r'^(.*/)?[\w-]*-(?P<epoch>\d+)\.pkl$')
 if LOAD_CHECKPOINT:
-    INITIAL_CHECKPOINT = max(glob.iglob(os.path.join(CHECKPOINT_DIR, 'sac-*.pkl')),
+    INITIAL_CHECKPOINT = max(glob.iglob(os.path.join(CHECKPOINT_DIR, '*.pkl')),
                              key=lambda path: int(CHECKPOINT_REGEX.search(path).group('epoch')),
                              default=None)
 else:
@@ -121,7 +121,7 @@ def main():
 
             writer.flush()
             if epoch % 10 == 0:
-                trainer.save_model(path=os.path.join(CHECKPOINT_DIR, f'sac-checkpoint-{epoch}.pkl'))
+                trainer.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
 
     ENV.close()
 
