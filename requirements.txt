@@ -1,0 +1,5 @@
+numpy
+tqdm
+pytorch
+tensorboard
+gym
