@@ -43,6 +43,11 @@ DEVICE_IDX = 0
 LOAD_CHECKPOINT = False
 RANDOM_SEED = 0
 
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+torch.manual_seed(RANDOM_SEED)
+ENV.seed(RANDOM_SEED)
+
 if GPU:
     DEVICE = torch.device(f'cuda:{DEVICE_IDX}' if torch.cuda.is_available() else 'cpu')
 else:
@@ -68,10 +73,6 @@ if INITIAL_CHECKPOINT is not None:
     INITIAL_EPOCH = int(CHECKPOINT_REGEX.search(INITIAL_CHECKPOINT).group('epoch'))
 else:
     INITIAL_EPOCH = 0
-random.seed(RANDOM_SEED)
-np.random.seed(RANDOM_SEED)
-torch.manual_seed(RANDOM_SEED)
-ENV.seed(RANDOM_SEED)
 
 
 def main():
