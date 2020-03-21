@@ -2,7 +2,6 @@ import itertools
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 
@@ -11,7 +10,7 @@ from sac.network import SoftQNetwork, PolicyNetwork
 
 
 class Trainer(object):
-    def __init__(self, env, state_dim, action_dim, hidden_dims,
+    def __init__(self, env, state_dim, action_dim, hidden_dims, activation,
                  soft_q_lr, policy_lr, alpha_lr, weight_decay,
                  buffer_capacity, writer, device):
         self.env = env
@@ -25,14 +24,14 @@ class Trainer(object):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
-        self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
-        self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
-        self.target_soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
-        self.target_soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
+        self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
+        self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
+        self.target_soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
+        self.target_soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
         self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
         self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
 
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=F.relu, device=device)
+        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
 
         self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, requires_grad=True, device=device))
 

@@ -15,7 +15,8 @@ from sac.trainer import Trainer as OriginTrainer
 
 class Trainer(OriginTrainer):
     def __init__(self, env, state_dim, action_dim,
-                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
+                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
+                 skip_connection, activation,
                  soft_q_lr, policy_lr, alpha_lr, weight_decay,
                  buffer_capacity, writer, device):
         self.env = env
@@ -30,17 +31,17 @@ class Trainer(OriginTrainer):
         self.action_dim = action_dim
 
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim,
-                                         hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
-                                         activation=F.relu, device=device)
+                                         hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
+                                         skip_connection, activation=activation, device=device)
         self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim,
                                          hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
-                                         activation=F.relu, device=device)
+                                         activation=activation, device=device)
         self.target_soft_q_net_1 = SoftQNetwork(state_dim, action_dim,
                                                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
-                                                activation=F.relu, device=device)
+                                                activation=activation, device=device)
         self.target_soft_q_net_2 = SoftQNetwork(state_dim, action_dim,
                                                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
-                                                activation=F.relu, device=device)
+                                                activation=activation, device=device)
         self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
         self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
 

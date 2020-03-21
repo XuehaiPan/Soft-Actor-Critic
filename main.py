@@ -8,6 +8,7 @@ from datetime import datetime
 import gym
 import numpy as np
 import torch
+import torch.nn.functional as F
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
@@ -20,6 +21,8 @@ if not USE_LSTM:
     ALGORITHM_NAME = 'SAC'
 else:
     ALGORITHM_NAME = 'SAC-LSTM'
+
+ACTIVATION = lambda x: F.leaky_relu(x, negative_slope=0.1)
 
 ENV_NAME = 'BipedalWalkerHardcore-v3'
 ENV = NormalizedActions(gym.make(ENV_NAME))
@@ -81,15 +84,14 @@ else:
 
 
 def main():
-    global MAX_EPISODE_STEPS
-
     writer = SummaryWriter(log_dir=LOG_DIR)
     if not USE_LSTM:
         from sac.trainer import Trainer
         trainer = Trainer(env=ENV,
                           state_dim=ENV.observation_space.shape[0],
                           action_dim=ENV.action_space.shape[0],
-                          hidden_dims=[512, 512, 512],
+                          hidden_dims=[256, 256, 128, 128],
+                          activation=ACTIVATION,
                           soft_q_lr=LEARNING_RATE,
                           policy_lr=LEARNING_RATE,
                           alpha_lr=LEARNING_RATE,
@@ -102,9 +104,10 @@ def main():
         trainer = Trainer(env=ENV,
                           state_dim=ENV.observation_space.shape[0],
                           action_dim=ENV.action_space.shape[0],
-                          hidden_dims_before_lstm=[512, 512],
-                          hidden_dims_lstm=[512],
-                          hidden_dims_after_lstm=[512, 512],
+                          hidden_dims_before_lstm=[256, 256, 256, 128, 128],
+                          hidden_dims_lstm=[128],
+                          hidden_dims_after_lstm=[128, 128],
+                          activation=ACTIVATION,
                           skip_connection=SKIP_CONNECTION,
                           soft_q_lr=LEARNING_RATE,
                           policy_lr=LEARNING_RATE,
@@ -126,11 +129,6 @@ def main():
                                render=RENDER)
         global_step = 0
         for epoch in range(INITIAL_EPOCH + 1, TOTAL_EPOCHS + 1):
-            if epoch >= 1000:
-                try:
-                    MAX_EPISODE_STEPS = ENV.spec.max_episode_steps
-                except AttributeError:
-                    pass
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
