@@ -67,15 +67,15 @@ class Trainer(OriginTrainer):
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
-    def env_sample(self, n_episodes, max_steps, deterministic, epsilon):
-        with tqdm.trange(n_episodes * max_steps, desc='Sampling') as pbar:
+    def env_sample(self, n_episodes, max_episode_steps, deterministic, epsilon, render=False):
+        with tqdm.trange(n_episodes * max_episode_steps, desc='Sampling') as pbar:
             for episode in range(n_episodes):
                 episode_reward = 0
-                episode_step = 0
+                episode_steps = 0
                 state = self.env.reset()
                 trajectory = []
                 hidden = None
-                for step in range(max_steps):
+                for step in range(max_episode_steps):
                     if np.random.binomial(1, epsilon) != 0:
                         action = self.policy_net.sample_action()
                     else:
@@ -83,21 +83,22 @@ class Trainer(OriginTrainer):
                     next_state, reward, done, _ = self.env.step(action)
 
                     episode_reward += reward
-                    episode_step += 1
+                    episode_steps += 1
                     trajectory.append((state, action, [reward], next_state, [done]))
                     state = next_state
                     if done:
-                        pbar.update(max_steps - step)
+                        pbar.update(max_episode_steps - step)
                         break
                     else:
                         pbar.update()
                 self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))))
                 self.n_episodes += 1
-                self.episode_steps.append(episode_step)
-                self.total_steps += episode_step
+                self.episode_steps.append(episode_steps)
+                self.total_steps += episode_steps
+                average_reward = episode_reward / episode_steps
                 self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.n_episodes)
-                self.writer.add_scalar(tag='sample/average_reward', scalar_value=episode_reward / episode_step, global_step=self.n_episodes)
-                self.writer.add_scalar(tag='sample/steps', scalar_value=episode_step, global_step=self.n_episodes)
+                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.n_episodes)
+                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.n_episodes)
 
                 pbar.set_postfix({'buffer_size': len(self.replay_buffer)})
 

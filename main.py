@@ -22,7 +22,10 @@ else:
 
 ENV_NAME = 'Pendulum-v0'
 ENV = NormalizedActions(gym.make(ENV_NAME))
-MAX_STEPS = 200
+try:
+    MAX_EPISODE_STEPS = min(500, ENV.spec.max_episode_steps)
+except AttributeError:
+    MAX_EPISODE_STEPS = 500
 
 N_EPISODES_EACH_SAMPLE = 1
 N_UPDATES_EACH_SAMPLE = 256
@@ -33,7 +36,7 @@ if USE_LSTM:
 
 DETERMINISTIC = False
 
-TOTAL_EPOCHS = 500
+TOTAL_EPOCHS = 2000
 LEARNING_RATE = 1E-3
 WEIGHT_DECAY = 1E-4
 BUFFER_CAPACITY = 100000
@@ -76,6 +79,8 @@ else:
 
 
 def main():
+    global MAX_EPISODE_STEPS
+
     writer = SummaryWriter(log_dir=LOG_DIR)
     if not USE_LSTM:
         from sac.trainer import Trainer
@@ -113,13 +118,18 @@ def main():
     if INITIAL_EPOCH < TOTAL_EPOCHS:
         while trainer.replay_buffer.size < BATCH_SIZE - 1:
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
-                               max_steps=MAX_STEPS,
+                               max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
                                epsilon=1.0)
         global_step = 0
         for epoch in range(INITIAL_EPOCH + 1, TOTAL_EPOCHS + 1):
+            if epoch >= 1000:
+                try:
+                    MAX_EPISODE_STEPS = ENV.spec.max_episode_steps
+                except AttributeError:
+                    pass
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
-                               max_steps=MAX_STEPS,
+                               max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
                                epsilon=0.0)
             q_value_loss_list = []
@@ -142,7 +152,7 @@ def main():
                                                   ('policy_loss', np.mean(policy_loss_list))]))
 
             writer.flush()
-            if epoch % 10 == 0:
+            if epoch % 20 == 0:
                 trainer.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
 
     ENV.close()
