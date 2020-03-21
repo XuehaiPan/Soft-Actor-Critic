@@ -1,6 +1,5 @@
 import itertools
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -62,7 +61,7 @@ class Trainer(object):
         print(f'buffer_capacity = {self.replay_buffer.capacity}')
         print('Modules:', self.modules)
 
-    def env_sample(self, n_episodes, max_episode_steps, deterministic, epsilon, render=False):
+    def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False):
         with tqdm.trange(n_episodes * max_episode_steps, desc='Sampling') as pbar:
             for episode in range(n_episodes):
                 episode_reward = 0
@@ -74,7 +73,7 @@ class Trainer(object):
                     except Exception:
                         pass
                 for step in range(max_episode_steps):
-                    if np.random.binomial(1, epsilon) != 0:
+                    if random_sample:
                         action = self.policy_net.sample_action()
                     else:
                         action = self.policy_net.get_action(state, deterministic=deterministic)
@@ -104,14 +103,15 @@ class Trainer(object):
 
                 pbar.set_postfix({'buffer_size': len(self.replay_buffer)})
 
-    def update(self, batch_size, reward_scale=1.0, auto_entropy=True, target_entropy=-2.0,
+    def update(self, batch_size, normalize_reward=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
         # size: (batch, item_size)
         state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
                                                             self.replay_buffer.sample(batch_size)))
 
         # Normalize rewards
-        reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
+        if normalize_reward:
+            reward = (reward - reward.mean()) / (reward.std() + epsilon)
 
         # Update temperature parameter
         new_action, log_prob = self.policy_net.evaluate(state)

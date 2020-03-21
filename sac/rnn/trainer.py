@@ -67,7 +67,7 @@ class Trainer(OriginTrainer):
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
-    def env_sample(self, n_episodes, max_episode_steps, deterministic, epsilon, render=False):
+    def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False):
         with tqdm.trange(n_episodes * max_episode_steps, desc='Sampling') as pbar:
             for episode in range(n_episodes):
                 episode_reward = 0
@@ -81,7 +81,7 @@ class Trainer(OriginTrainer):
                     except Exception:
                         pass
                 for step in range(max_episode_steps):
-                    if np.random.binomial(1, epsilon) != 0:
+                    if random_sample:
                         action = self.policy_net.sample_action()
                     else:
                         action, hidden = self.policy_net.get_action(state, hidden, deterministic=deterministic)
@@ -112,7 +112,7 @@ class Trainer(OriginTrainer):
 
                 pbar.set_postfix({'buffer_size': len(self.replay_buffer)})
 
-    def update(self, batch_size, reward_scale=1.0, auto_entropy=True, target_entropy=-2.0,
+    def update(self, batch_size, normalize_reward=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
         # size: (batch, seq_len, item_size)
         batch_trajectory_state, batch_trajectory_action, batch_trajectory_reward, \
@@ -130,7 +130,8 @@ class Trainer(OriginTrainer):
         done = pad_sequence(batch_trajectory_done).to(self.device)
 
         # Normalize rewards
-        reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
+        if normalize_reward:
+            reward = (reward - reward.mean()) / (reward.std() + epsilon)
 
         # Update temperature parameter
         new_action, log_prob, _ = self.policy_net.evaluate(state, None)

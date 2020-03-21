@@ -120,8 +120,7 @@ def main():
         while trainer.replay_buffer.size < BATCH_SIZE - 1:
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
-                               deterministic=DETERMINISTIC,
-                               epsilon=1.0,
+                               random_sample=True,
                                render=RENDER)
         global_step = 0
         for epoch in range(INITIAL_EPOCH + 1, TOTAL_EPOCHS + 1):
@@ -133,14 +132,15 @@ def main():
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
-                               epsilon=0.0,
+                               random_sample=False,
                                render=RENDER)
             q_value_loss_list = []
             policy_loss_list = []
             with tqdm.trange(N_UPDATES_EACH_SAMPLE, desc=f'Training {epoch}/{TOTAL_EPOCHS}') as pbar:
                 for i in pbar:
                     q_value_loss_1, q_value_loss_2, policy_loss = trainer.update(batch_size=BATCH_SIZE,
-                                                                                 reward_scale=10,
+                                                                                 normalize_reward=True,
+                                                                                 auto_entropy=True,
                                                                                  target_entropy=-1.0 * trainer.action_dim,
                                                                                  soft_tau=0.01)
                     global_step += 1
