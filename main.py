@@ -26,6 +26,7 @@ try:
     MAX_EPISODE_STEPS = min(500, ENV.spec.max_episode_steps)
 except AttributeError:
     MAX_EPISODE_STEPS = 500
+RENDER = True
 
 N_EPISODES_EACH_SAMPLE = 1
 N_UPDATES_EACH_SAMPLE = 256
@@ -120,7 +121,8 @@ def main():
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
-                               epsilon=1.0)
+                               epsilon=1.0,
+                               render=RENDER)
         global_step = 0
         for epoch in range(INITIAL_EPOCH + 1, TOTAL_EPOCHS + 1):
             if epoch >= 1000:
@@ -131,7 +133,8 @@ def main():
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
-                               epsilon=0.0)
+                               epsilon=0.0,
+                               render=RENDER)
             q_value_loss_list = []
             policy_loss_list = []
             with tqdm.trange(N_UPDATES_EACH_SAMPLE, desc=f'Training {epoch}/{TOTAL_EPOCHS}') as pbar:

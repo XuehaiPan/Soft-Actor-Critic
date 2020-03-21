@@ -72,15 +72,25 @@ class Trainer(OriginTrainer):
             for episode in range(n_episodes):
                 episode_reward = 0
                 episode_steps = 0
-                state = self.env.reset()
                 trajectory = []
                 hidden = None
+                state = self.env.reset()
+                if render:
+                    try:
+                        self.env.render()
+                    except Exception:
+                        pass
                 for step in range(max_episode_steps):
                     if np.random.binomial(1, epsilon) != 0:
                         action = self.policy_net.sample_action()
                     else:
                         action, hidden = self.policy_net.get_action(state, hidden, deterministic=deterministic)
                     next_state, reward, done, _ = self.env.step(action)
+                    if render:
+                        try:
+                            self.env.render()
+                        except Exception:
+                            pass
 
                     episode_reward += reward
                     episode_steps += 1
