@@ -96,12 +96,16 @@ class Trainer(OriginTrainer):
                     episode_steps += 1
                     trajectory.append((state, action, [reward], next_state, [done]))
                     state = next_state
+
+                    pbar.update()
                     if done:
-                        pbar.update(max_episode_steps - step)
+                        pbar.total -= max_episode_steps - step - 1
+                        pbar.refresh()
                         break
-                    else:
-                        pbar.update()
+
                 self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))))
+                pbar.set_postfix({'buffer_size': self.replay_buffer.size})
+
                 self.n_episodes += 1
                 self.episode_steps.append(episode_steps)
                 self.total_steps += episode_steps
@@ -110,7 +114,7 @@ class Trainer(OriginTrainer):
                 self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.n_episodes)
                 self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.n_episodes)
 
-                pbar.set_postfix({'buffer_size': len(self.replay_buffer)})
+        self.writer.flush()
 
     def update(self, batch_size, normalize_reward=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
