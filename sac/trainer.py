@@ -151,5 +151,5 @@ class Trainer(object):
         torch.save(self.modules.state_dict(), path)
 
     def load_model(self, path):
-        self.modules.load_state_dict(torch.load(path))
+        self.modules.load_state_dict(torch.load(path, map_location=self.device))
         self.modules.eval()
