@@ -15,12 +15,13 @@ from common.environment import NormalizedActions
 
 
 USE_LSTM = True
+SKIP_CONNECTION = True
 if not USE_LSTM:
     ALGORITHM_NAME = 'SAC'
 else:
     ALGORITHM_NAME = 'SAC-LSTM'
 
-ENV_NAME = 'Pendulum-v0'
+ENV_NAME = 'BipedalWalkerHardcore-v3'
 ENV = NormalizedActions(gym.make(ENV_NAME))
 try:
     MAX_EPISODE_STEPS = min(500, ENV.spec.max_episode_steps)
@@ -104,6 +105,7 @@ def main():
                           hidden_dims_before_lstm=[512, 512],
                           hidden_dims_lstm=[512],
                           hidden_dims_after_lstm=[512, 512],
+                          skip_connection=SKIP_CONNECTION,
                           soft_q_lr=LEARNING_RATE,
                           policy_lr=LEARNING_RATE,
                           alpha_lr=LEARNING_RATE,
@@ -155,7 +157,7 @@ def main():
                                                   ('policy_loss', np.mean(policy_loss_list))]))
 
             writer.flush()
-            if epoch % 20 == 0:
+            if epoch % 50 == 0:
                 trainer.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
 
     ENV.close()

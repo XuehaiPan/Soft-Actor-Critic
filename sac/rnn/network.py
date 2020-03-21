@@ -10,11 +10,13 @@ DEVICE_CPU = torch.device('cpu')
 
 
 class ValueNetwork(VanillaLSTMNetwork):
-    def __init__(self, state_dim, hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
+    def __init__(self, state_dim,
+                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                  activation=F.relu, device=DEVICE_CPU):
         super().__init__(n_dims_before_lstm=[state_dim, *hidden_dims_before_lstm],
                          n_dims_lstm_hidden=hidden_dims_lstm,
                          n_dims_after_lstm=[*hidden_dims_after_lstm, 1],
+                         skip_connection=skip_connection,
                          activation=activation,
                          output_activation=None,
                          device=device)
@@ -26,11 +28,13 @@ class ValueNetwork(VanillaLSTMNetwork):
 
 
 class SoftQNetwork(VanillaLSTMNetwork):
-    def __init__(self, state_dim, action_dim, hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
+    def __init__(self, state_dim, action_dim,
+                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                  activation=F.relu, device=DEVICE_CPU):
         super().__init__(n_dims_before_lstm=[state_dim + action_dim, *hidden_dims_before_lstm],
                          n_dims_lstm_hidden=hidden_dims_lstm,
                          n_dims_after_lstm=[*hidden_dims_after_lstm, 1],
+                         skip_connection=skip_connection,
                          activation=activation,
                          output_activation=None,
                          device=device)
@@ -43,11 +47,13 @@ class SoftQNetwork(VanillaLSTMNetwork):
 
 
 class PolicyNetwork(VanillaLSTMNetwork):
-    def __init__(self, state_dim, action_dim, hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
+    def __init__(self, state_dim, action_dim,
+                 hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                  activation=F.relu, device=DEVICE_CPU, log_std_min=-20, log_std_max=2):
         super().__init__(n_dims_before_lstm=[state_dim, *hidden_dims_before_lstm],
                          n_dims_lstm_hidden=hidden_dims_lstm,
                          n_dims_after_lstm=[*hidden_dims_after_lstm, 2 * action_dim],
+                         skip_connection=skip_connection,
                          activation=activation,
                          output_activation=None,
                          device=device)

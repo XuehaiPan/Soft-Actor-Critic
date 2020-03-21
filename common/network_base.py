@@ -49,7 +49,7 @@ class VanillaNeuralNetwork(NetworkBase):
 
 
 class VanillaLSTMNetwork(NetworkBase):
-    def __init__(self, n_dims_before_lstm, n_dims_lstm_hidden, n_dims_after_lstm,
+    def __init__(self, n_dims_before_lstm, n_dims_lstm_hidden, n_dims_after_lstm, skip_connection,
                  activation=F.relu, output_activation=None, device=DEVICE_CPU):
         assert len(n_dims_lstm_hidden) > 0
 
@@ -58,6 +58,10 @@ class VanillaLSTMNetwork(NetworkBase):
 
         n_dims_lstm_hidden = [n_dims_before_lstm[-1], *n_dims_lstm_hidden]
         n_dims_after_lstm = [n_dims_lstm_hidden[-1], *n_dims_after_lstm]
+
+        self.skip_connection = skip_connection
+        if skip_connection:
+            n_dims_after_lstm[0] += n_dims_before_lstm[-1]
 
         self.activation = activation
         self.output_activation = output_activation
@@ -92,8 +96,10 @@ class VanillaLSTMNetwork(NetworkBase):
             batch_size = x.shape[1]
             hx = list(zip(map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_hiddens),
                           map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_cells)))
-        x = self.linear_layers_before_lstm(x)
+        identity = x = self.linear_layers_before_lstm(x)
         for i, lstm_layer in enumerate(self.lstm_layers):
             x, hx[i] = lstm_layer(x, hx[i])
+        if self.skip_connection:
+            x = torch.cat([x, identity], dim=-1)
         x = self.linear_layers_after_lstm(x)
         return x, hx
