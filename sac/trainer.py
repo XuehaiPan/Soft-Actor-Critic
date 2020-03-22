@@ -63,6 +63,9 @@ class Trainer(object):
         print('Modules:', self.modules)
 
     def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False):
+        training = self.training
+        self.eval()
+
         with tqdm.trange(n_episodes * max_episode_steps, desc='Sampling') as pbar:
             for episode in range(n_episodes):
                 episode_reward = 0
@@ -107,8 +110,12 @@ class Trainer(object):
 
         self.writer.flush()
 
+        self.train(mode=training)
+
     def update(self, batch_size, normalize_reward=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
+        self.train()
+
         # size: (batch, item_size)
         state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
                                                             self.replay_buffer.sample(batch_size)))

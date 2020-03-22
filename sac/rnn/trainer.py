@@ -69,6 +69,9 @@ class Trainer(OriginTrainer):
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
     def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False):
+        training = self.training
+        self.eval()
+
         with tqdm.trange(n_episodes * max_episode_steps, desc='Sampling') as pbar:
             for episode in range(n_episodes):
                 episode_reward = 0
@@ -117,8 +120,12 @@ class Trainer(OriginTrainer):
 
         self.writer.flush()
 
+        self.train(mode=training)
+
     def update(self, batch_size, normalize_reward=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
+        self.train()
+
         # size: (batch, seq_len, item_size)
         batch_trajectory_state, batch_trajectory_action, batch_trajectory_reward, \
         batch_trajectory_next_state, batch_trajectory_done = self.replay_buffer.sample(batch_size)
