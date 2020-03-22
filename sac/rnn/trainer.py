@@ -30,6 +30,8 @@ class Trainer(OriginTrainer):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
+        self.training = True
+
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim,
                                          hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                                          skip_connection, activation=activation, device=device)
