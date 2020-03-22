@@ -98,7 +98,6 @@ def main():
                           alpha_lr=LEARNING_RATE,
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
-                          writer=writer,
                           device=DEVICE)
     else:
         from sac.rnn.trainer import Trainer
@@ -115,7 +114,6 @@ def main():
                           alpha_lr=LEARNING_RATE,
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
-                          writer=writer,
                           device=DEVICE)
     trainer.print_info()
 
@@ -124,7 +122,7 @@ def main():
         trainer.train()
 
     if INITIAL_EPOCH < TOTAL_EPOCHS:
-        while trainer.replay_buffer.size < 10 * BATCH_SIZE - 1:
+        while trainer.replay_buffer.size < 10 * BATCH_SIZE:
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
                                random_sample=True,
@@ -135,7 +133,8 @@ def main():
                                max_episode_steps=MAX_EPISODE_STEPS,
                                deterministic=DETERMINISTIC,
                                random_sample=False,
-                               render=RENDER)
+                               render=RENDER,
+                               writer=writer)
             q_value_loss_list = []
             policy_loss_list = []
             with tqdm.trange(N_UPDATES_EACH_SAMPLE, desc=f'Training {epoch}/{TOTAL_EPOCHS}') as pbar:

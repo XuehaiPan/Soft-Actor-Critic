@@ -18,14 +18,13 @@ class Trainer(OriginTrainer):
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                  skip_connection, activation,
                  soft_q_lr, policy_lr, alpha_lr, weight_decay,
-                 buffer_capacity, writer, device):
+                 buffer_capacity, device):
         self.env = env
         self.device = device
         self.replay_buffer = TrajectoryReplayBuffer(capacity=buffer_capacity)
         self.n_episodes = 0
         self.episode_steps = []
         self.total_steps = 0
-        self.writer = writer
 
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -70,7 +69,7 @@ class Trainer(OriginTrainer):
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
-    def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False):
+    def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False, writer=None):
         training = self.training
         self.eval()
 
@@ -112,15 +111,17 @@ class Trainer(OriginTrainer):
                 self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))))
                 pbar.set_postfix({'buffer_size': self.replay_buffer.size})
 
-                self.n_episodes += 1
-                self.episode_steps.append(episode_steps)
-                self.total_steps += episode_steps
-                average_reward = episode_reward / episode_steps
-                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.n_episodes)
-                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.n_episodes)
-                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.n_episodes)
-
-        self.writer.flush()
+                if not random_sample:
+                    self.n_episodes += 1
+                    self.episode_steps.append(episode_steps)
+                    self.total_steps += episode_steps
+                    average_reward = episode_reward / episode_steps
+                    if writer is not None:
+                        writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.n_episodes)
+                        writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.n_episodes)
+                        writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.n_episodes)
+        if not random_sample and writer is not None:
+            writer.flush()
 
         self.train(mode=training)
 
