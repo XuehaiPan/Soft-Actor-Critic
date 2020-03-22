@@ -30,21 +30,22 @@ try:
     MAX_EPISODE_STEPS = min(500, ENV.spec.max_episode_steps)
 except AttributeError:
     MAX_EPISODE_STEPS = 500
-RENDER = True
+RENDER = False
 
+TOTAL_EPOCHS = 5000
+BUFFER_CAPACITY = 100000
 N_EPISODES_EACH_SAMPLE = 1
 N_UPDATES_EACH_SAMPLE = 256
 BATCH_SIZE = 256
 if USE_LSTM:
-    N_UPDATES_EACH_SAMPLE = 32
+    N_UPDATES_EACH_SAMPLE = 4
     BATCH_SIZE = 16
+    BUFFER_CAPACITY = 1000
 
 DETERMINISTIC = False
 
-TOTAL_EPOCHS = 2000
 LEARNING_RATE = 1E-3
 WEIGHT_DECAY = 1E-4
-BUFFER_CAPACITY = 100000
 
 GPU = True
 DEVICE_IDX = 0
@@ -90,7 +91,7 @@ def main():
         trainer = Trainer(env=ENV,
                           state_dim=ENV.observation_space.shape[0],
                           action_dim=ENV.action_space.shape[0],
-                          hidden_dims=[256, 256, 128, 128],
+                          hidden_dims=[256, 256, 256, 128, 128, 128],
                           activation=ACTIVATION,
                           soft_q_lr=LEARNING_RATE,
                           policy_lr=LEARNING_RATE,
@@ -123,7 +124,7 @@ def main():
         trainer.train()
 
     if INITIAL_EPOCH < TOTAL_EPOCHS:
-        while trainer.replay_buffer.size < BATCH_SIZE - 1:
+        while trainer.replay_buffer.size < 10 * BATCH_SIZE - 1:
             trainer.env_sample(n_episodes=N_EPISODES_EACH_SAMPLE,
                                max_episode_steps=MAX_EPISODE_STEPS,
                                random_sample=True,
@@ -140,7 +141,7 @@ def main():
             with tqdm.trange(N_UPDATES_EACH_SAMPLE, desc=f'Training {epoch}/{TOTAL_EPOCHS}') as pbar:
                 for i in pbar:
                     q_value_loss_1, q_value_loss_2, policy_loss = trainer.update(batch_size=BATCH_SIZE,
-                                                                                 normalize_reward=True,
+                                                                                 normalize_rewards=True,
                                                                                  auto_entropy=True,
                                                                                  target_entropy=-1.0 * trainer.action_dim,
                                                                                  soft_tau=0.01)

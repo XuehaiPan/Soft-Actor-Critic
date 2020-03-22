@@ -124,17 +124,13 @@ class Trainer(OriginTrainer):
 
         self.train(mode=training)
 
-    def update(self, batch_size, normalize_reward=True, auto_entropy=True, target_entropy=-2.0,
+    def update(self, batch_size, normalize_rewards=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
         self.train()
 
         # size: (batch, seq_len, item_size)
         batch_trajectory_state, batch_trajectory_action, batch_trajectory_reward, \
         batch_trajectory_next_state, batch_trajectory_done = self.replay_buffer.sample(batch_size)
-
-        # size: (batch, 1, item_size)
-        first_state = torch.stack(list(next(zip(*batch_trajectory_state)))).unsqueeze(dim=0).to(self.device)
-        first_action = torch.stack(list(next(zip(*batch_trajectory_action)))).unsqueeze(dim=0).to(self.device)
 
         # size: (seq_len, batch, item_size)
         state = pad_sequence(batch_trajectory_state).to(self.device)
@@ -143,9 +139,17 @@ class Trainer(OriginTrainer):
         reward = pad_sequence(batch_trajectory_reward).to(self.device)
         done = pad_sequence(batch_trajectory_done).to(self.device)
 
+        # size: (1, batch, item_size)
+        first_state = state[0].unsqueeze(dim=0).to(self.device)
+        first_action = action[0].unsqueeze(dim=0).to(self.device)
+
         # Normalize rewards
-        if normalize_reward:
-            reward = (reward - reward.mean()) / (reward.std() + epsilon)
+        if normalize_rewards:
+            with torch.no_grad():
+                mask = pad_sequence([torch.ones(len(trajectory_reward), 1)
+                                     for trajectory_reward in batch_trajectory_reward]).bool()
+                masked_reward = reward[mask]
+                reward[mask] = (masked_reward - masked_reward.mean()) / (masked_reward.std() + epsilon)
 
         # Update temperature parameter
         new_action, log_prob, _ = self.policy_net.evaluate(state, None)
@@ -154,7 +158,8 @@ class Trainer(OriginTrainer):
             self.alpha_optimizer.zero_grad()
             alpha_loss.backward()
             self.alpha_optimizer.step()
-            alpha = self.log_alpha.exp()
+            with torch.no_grad():
+                alpha = self.log_alpha.exp()
         else:
             alpha = 1.0
 

@@ -92,7 +92,7 @@ class VanillaLSTMNetwork(NetworkBase):
 
     def forward(self, x, hx=None):
         if hx is None:
-            batch_size = x.shape[1]
+            batch_size = x.size(1)
             hx = list(zip(map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_hiddens),
                           map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_cells)))
         identity = x = self.linear_layers_before_lstm(x)
