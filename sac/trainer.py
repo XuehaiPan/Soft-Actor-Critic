@@ -24,6 +24,8 @@ class Trainer(object):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
+        self.training = True
+
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
         self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
         self.target_soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
@@ -165,4 +167,11 @@ class Trainer(object):
 
     def load_model(self, path):
         self.modules.load_state_dict(torch.load(path, map_location=self.device))
-        self.modules.eval()
+
+    def train(self, mode=True):
+        self.training = mode
+        self.modules.train(mode=mode)
+        return self
+
+    def eval(self):
+        return self.train(mode=False)

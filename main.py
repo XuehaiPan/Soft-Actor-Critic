@@ -120,6 +120,7 @@ def main():
 
     if INITIAL_CHECKPOINT is not None:
         trainer.load_model(path=INITIAL_CHECKPOINT)
+        trainer.train()
 
     if INITIAL_EPOCH < TOTAL_EPOCHS:
         while trainer.replay_buffer.size < BATCH_SIZE - 1:
