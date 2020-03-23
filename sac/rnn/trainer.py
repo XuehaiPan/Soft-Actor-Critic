@@ -125,75 +125,124 @@ class Trainer(OriginTrainer):
 
         self.train(mode=training)
 
-    def update(self, batch_size, normalize_rewards=True, auto_entropy=True, target_entropy=-2.0,
+    def update(self, batch_size, max_step_size=32, normalize_rewards=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
+
+        def decrease_batch_size(hidden, batch_size):
+            new_hidden = []
+            for h, c in hidden:
+                h = h[:, :batch_size, :].detach()
+                c = c[:, :batch_size, :].detach()
+                new_hidden.append((h, c))
+            return new_hidden
+
+        def dynamic_batch_step_size(offset):
+            remain_lengths = lengths - offset
+            remain_lengths = remain_lengths[remain_lengths > 0]
+            batch_size = len(remain_lengths)
+            try:
+                step_size = min(remain_lengths.min(), max_step_size)
+            except ValueError:
+                step_size = 0
+            return batch_size, step_size
+
         self.train()
 
         # size: (batch, seq_len, item_size)
         batch_trajectory_state, batch_trajectory_action, batch_trajectory_reward, \
-        batch_trajectory_next_state, batch_trajectory_done = self.replay_buffer.sample(batch_size)
+        batch_trajectory_next_state, batch_trajectory_done = self.replay_buffer.sample(batch_size, enforce_sorted=True)
+
+        lengths = np.asanyarray([trajectory_state.size(0) for trajectory_state in batch_trajectory_state], dtype=np.int64)
 
         # size: (seq_len, batch, item_size)
-        state = pad_sequence(batch_trajectory_state).to(self.device)
-        next_state = pad_sequence(batch_trajectory_next_state).to(self.device)
-        action = pad_sequence(batch_trajectory_action).to(self.device)
-        reward = pad_sequence(batch_trajectory_reward).to(self.device)
-        done = pad_sequence(batch_trajectory_done).to(self.device)
-
-        # size: (1, batch, item_size)
-        first_state = state[0].unsqueeze(dim=0).to(self.device)
-        first_action = action[0].unsqueeze(dim=0).to(self.device)
+        padded_state = pad_sequence(batch_trajectory_state).to(self.device)
+        padded_next_state = pad_sequence(batch_trajectory_next_state).to(self.device)
+        padded_action = pad_sequence(batch_trajectory_action).to(self.device)
+        padded_reward = pad_sequence(batch_trajectory_reward).to(self.device)
+        padded_done = pad_sequence(batch_trajectory_done).to(self.device)
 
         # Normalize rewards
         if normalize_rewards:
             with torch.no_grad():
-                mask = pad_sequence([torch.ones(len(trajectory_reward), 1)
-                                     for trajectory_reward in batch_trajectory_reward]).bool()
-                masked_reward = reward[mask]
-                reward[mask] = (masked_reward - masked_reward.mean()) / (masked_reward.std() + epsilon)
+                mask = pad_sequence([torch.ones(length, 1) for length in lengths]).bool()
+                masked_reward = padded_reward[mask]
+                padded_reward[mask] = (masked_reward - masked_reward.mean()) / (masked_reward.std() + epsilon)
 
-        # Update temperature parameter
-        new_action, log_prob, _ = self.policy_net.evaluate(state, None)
-        if auto_entropy is True:
-            alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
-            self.alpha_optimizer.zero_grad()
-            alpha_loss.backward()
-            self.alpha_optimizer.step()
+        offset = 0
+        soft_q_net_1_hidden = self.soft_q_net_1.initial_hiddens(batch_size=batch_size)
+        soft_q_net_2_hidden = self.soft_q_net_2.initial_hiddens(batch_size=batch_size)
+        target_soft_q_net_1_hidden = self.target_soft_q_net_1.initial_hiddens(batch_size=batch_size)
+        target_soft_q_net_2_hidden = self.target_soft_q_net_2.initial_hiddens(batch_size=batch_size)
+        policy_net_hiddens = self.policy_net.initial_hiddens(batch_size=batch_size)
+        while True:
+            batch_size, step_size = dynamic_batch_step_size(offset=offset)
+            if not (batch_size > 0 and step_size > 0):
+                break
+
+            if offset > 0:
+                soft_q_net_1_hidden = decrease_batch_size(hidden=soft_q_net_1_hidden, batch_size=batch_size)
+                soft_q_net_2_hidden = decrease_batch_size(hidden=soft_q_net_2_hidden, batch_size=batch_size)
+                target_soft_q_net_1_hidden = decrease_batch_size(hidden=target_soft_q_net_1_hidden, batch_size=batch_size)
+                target_soft_q_net_2_hidden = decrease_batch_size(hidden=target_soft_q_net_2_hidden, batch_size=batch_size)
+                policy_net_hiddens = decrease_batch_size(hidden=policy_net_hiddens, batch_size=batch_size)
+
+            # size: (step_size, batch, item_size)
+            state = padded_state[offset:offset + step_size, :batch_size]
+            next_state = padded_next_state[offset:offset + step_size, :batch_size]
+            action = padded_action[offset:offset + step_size, :batch_size]
+            reward = padded_reward[offset:offset + step_size, :batch_size]
+            done = padded_done[offset:offset + step_size, :batch_size]
+
+            # size: (1, batch, item_size)
+            first_state = state[0].unsqueeze(dim=0).to(self.device)
+            first_action = action[0].unsqueeze(dim=0).to(self.device)
+
+            # Update temperature parameter
+            new_action, log_prob, _ = self.policy_net.evaluate(state, None)
+            if auto_entropy is True:
+                alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
+                self.alpha_optimizer.zero_grad()
+                alpha_loss.backward()
+                self.alpha_optimizer.step()
+                with torch.no_grad():
+                    alpha = self.log_alpha.exp()
+            else:
+                alpha = 1.0
+
+            # Training Q function
+            predicted_q_value_1, soft_q_net_1_hidden = self.soft_q_net_1(state, action, soft_q_net_1_hidden)
+            predicted_q_value_2, soft_q_net_2_hidden = self.soft_q_net_2(state, action, soft_q_net_2_hidden)
             with torch.no_grad():
-                alpha = self.log_alpha.exp()
-        else:
-            alpha = 1.0
+                _, _, policy_net_second_state_hidden = self.policy_net.evaluate(first_state, policy_net_hiddens)
+                new_next_action, next_log_prob, _ = self.policy_net.evaluate(next_state, policy_net_second_state_hidden)
 
-        # Training Q function
-        predicted_q_value_1, _ = self.soft_q_net_1(state, action, None)
-        predicted_q_value_2, _ = self.soft_q_net_2(state, action, None)
-        with torch.no_grad():
-            _, _, policy_net_second_state_hidden = self.policy_net.evaluate(first_state, None)
-            new_next_action, next_log_prob, _ = self.policy_net.evaluate(next_state, policy_net_second_state_hidden)
+                _, target_soft_q_net_1_second_state_hidden = self.target_soft_q_net_1(first_state, first_action, target_soft_q_net_1_hidden)
+                _, target_soft_q_net_2_second_state_hidden = self.target_soft_q_net_2(first_state, first_action, target_soft_q_net_2_hidden)
+                target_q_value_1, _ = self.target_soft_q_net_1(next_state, new_next_action, target_soft_q_net_1_second_state_hidden)
+                target_q_value_2, _ = self.target_soft_q_net_1(next_state, new_next_action, target_soft_q_net_2_second_state_hidden)
+                _, target_soft_q_net_1_hidden = self.soft_q_net_1(state, action, target_soft_q_net_1_hidden)
+                _, target_soft_q_net_2_hidden = self.soft_q_net_2(state, action, target_soft_q_net_2_hidden)
+                target_q_min = torch.min(target_q_value_1, target_q_value_2)
+                target_q_min -= alpha * next_log_prob
+                target_q_value = reward + (1 - done) * gamma * target_q_min
+            q_value_loss_1 = self.soft_q_criterion_1(predicted_q_value_1, target_q_value)
+            q_value_loss_2 = self.soft_q_criterion_2(predicted_q_value_2, target_q_value)
 
-            _, target_soft_q_net_1_second_state_hidden = self.target_soft_q_net_1(first_state, first_action, None)
-            _, target_soft_q_net_2_second_state_hidden = self.target_soft_q_net_2(first_state, first_action, None)
-            target_q_value_1, _ = self.target_soft_q_net_1(next_state, new_next_action, target_soft_q_net_1_second_state_hidden)
-            target_q_value_2, _ = self.target_soft_q_net_1(next_state, new_next_action, target_soft_q_net_2_second_state_hidden)
-            target_q_min = torch.min(target_q_value_1, target_q_value_2)
-            target_q_min -= alpha * next_log_prob
-            target_q_value = reward + (1 - done) * gamma * target_q_min
-        q_value_loss_1 = self.soft_q_criterion_1(predicted_q_value_1, target_q_value)
-        q_value_loss_2 = self.soft_q_criterion_2(predicted_q_value_2, target_q_value)
+            self.soft_q_optimizer.zero_grad()
+            q_value_loss_1.backward()
+            q_value_loss_2.backward()
+            self.soft_q_optimizer.step()
 
-        self.soft_q_optimizer.zero_grad()
-        q_value_loss_1.backward()
-        q_value_loss_2.backward()
-        self.soft_q_optimizer.step()
+            # Training policy function
+            predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action, soft_q_net_1_hidden)[0],
+                                              self.soft_q_net_2(state, new_action, soft_q_net_1_hidden)[0]).detach()
+            policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
 
-        # Training policy function
-        predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action, None)[0],
-                                          self.soft_q_net_2(state, new_action, None)[0])
-        policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
+            self.policy_optimizer.zero_grad()
+            policy_loss.backward()
+            self.policy_optimizer.step()
 
-        self.policy_optimizer.zero_grad()
-        policy_loss.backward()
-        self.policy_optimizer.step()
+            offset += step_size
 
         # Soft update the target value net
         for target_param, param in zip(self.target_soft_q_net_1.parameters(), self.soft_q_net_1.parameters()):

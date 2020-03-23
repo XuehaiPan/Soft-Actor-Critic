@@ -156,7 +156,7 @@ class Trainer(object):
 
         # Training policy function
         predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action),
-                                          self.soft_q_net_2(state, new_action))
+                                          self.soft_q_net_2(state, new_action)).detach()
         policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
 
         self.policy_optimizer.zero_grad()

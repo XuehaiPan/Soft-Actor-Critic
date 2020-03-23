@@ -92,9 +92,7 @@ class VanillaLSTMNetwork(NetworkBase):
 
     def forward(self, x, hx=None):
         if hx is None:
-            batch_size = x.size(1)
-            hx = list(zip(map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_hiddens),
-                          map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_cells)))
+            hx = self.initial_hiddens(batch_size=x.size(1))
         identity = x = self.linear_layers_before_lstm(x)
         for i, lstm_layer in enumerate(self.lstm_layers):
             x, hx[i] = lstm_layer(x, hx[i])
@@ -102,3 +100,7 @@ class VanillaLSTMNetwork(NetworkBase):
             x = torch.cat([x, identity], dim=-1)
         x = self.linear_layers_after_lstm(x)
         return x, hx
+
+    def initial_hiddens(self, batch_size=1):
+        return list(zip(map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_hiddens),
+                        map(lambda tensor: tensor.repeat(1, batch_size, 1), self.init_cells)))

@@ -35,8 +35,11 @@ class ReplayBuffer(object):
 
 
 class TrajectoryReplayBuffer(ReplayBuffer):
-    def sample(self, batch_size):
+    def sample(self, batch_size, enforce_sorted=True):
         batch = random.sample(self.buffer, batch_size)
+
+        if enforce_sorted:
+            batch.sort(key=lambda trajectory: len(trajectory[0]), reverse=True)
 
         # size: (batch, seq_len, item_size)
         # batch_trajectory_{state, action, reward, next_state, done}

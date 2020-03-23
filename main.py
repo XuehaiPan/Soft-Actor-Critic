@@ -44,6 +44,8 @@ rnn_group.add_argument('--hidden-dims-after-lstm', type=int, default=[512], narg
                        help='hidden FC dimensions after LSTM')
 rnn_group.add_argument('--skip-connection', action='store_true', default=False,
                        help='add skip connection beside LSTM')
+rnn_group.add_argument('--max-step-size', type=int, default=32,
+                       help='max continuous steps for update (default: 32)')
 parser.add_argument('--max-episodes', type=int, default=1000,
                     help='max learning episodes (default: 1000)')
 parser.add_argument('--max-episode-steps', type=int, default=1000,
@@ -74,6 +76,7 @@ if USE_LSTM:
     HIDDEN_DIMS_AFTER_LSTM = args.hidden_dims_after_lstm
     HIDDEN_DIMS_LSTM = args.hidden_dims_lstm
     SKIP_CONNECTION = args.skip_connection
+    MAX_STEP_SIZE = args.max_step_size
 else:
     HIDDEN_DIMS = args.hidden_dims
 
@@ -133,6 +136,7 @@ else:
 
 def main():
     writer = SummaryWriter(log_dir=LOG_DIR)
+    update_kwargs = {}
     if not USE_LSTM:
         from sac.trainer import Trainer
         trainer = Trainer(env=ENV,
@@ -162,6 +166,7 @@ def main():
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
                           device=DEVICE)
+        update_kwargs.update({'max_step_size': MAX_STEP_SIZE})
     trainer.print_info()
 
     if INITIAL_CHECKPOINT is not None:
@@ -190,7 +195,8 @@ def main():
                                                                                  normalize_rewards=True,
                                                                                  auto_entropy=True,
                                                                                  target_entropy=-1.0 * trainer.action_dim,
-                                                                                 soft_tau=0.01)
+                                                                                 soft_tau=0.01,
+                                                                                 **update_kwargs)
                     global_step += 1
                     q_value_loss_list.append(q_value_loss_1)
                     q_value_loss_list.append(q_value_loss_2)
