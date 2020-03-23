@@ -10,10 +10,10 @@ from torch.nn.utils.rnn import pad_sequence
 
 from common.buffer import TrajectoryReplayBuffer
 from sac.rnn.network import SoftQNetwork, PolicyNetwork
-from sac.trainer import Trainer as OriginTrainer
+from sac.trainer import Trainer as OriginalTrainer
 
 
-class Trainer(OriginTrainer):
+class Trainer(OriginalTrainer):
     def __init__(self, env, state_dim, action_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                  skip_connection, activation,
@@ -127,12 +127,19 @@ class Trainer(OriginTrainer):
 
     def update(self, batch_size, max_step_size=32, normalize_rewards=True, auto_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
-
-        def decrease_batch_size(hidden, batch_size):
+        def detach_hidden(hidden):
             new_hidden = []
             for h, c in hidden:
-                h = h[:, :batch_size, :].detach()
-                c = c[:, :batch_size, :].detach()
+                h = h.detach()
+                c = c.detach()
+                new_hidden.append((h, c))
+            return new_hidden
+
+        def decrease_hidden_batch_size(hidden, batch_size):
+            new_hidden = []
+            for h, c in hidden:
+                h = h[:, :batch_size, :]
+                c = c[:, :batch_size, :]
                 new_hidden.append((h, c))
             return new_hidden
 
@@ -173,18 +180,21 @@ class Trainer(OriginTrainer):
         soft_q_net_2_hidden = self.soft_q_net_2.initial_hiddens(batch_size=batch_size)
         target_soft_q_net_1_hidden = self.target_soft_q_net_1.initial_hiddens(batch_size=batch_size)
         target_soft_q_net_2_hidden = self.target_soft_q_net_2.initial_hiddens(batch_size=batch_size)
-        policy_net_hiddens = self.policy_net.initial_hiddens(batch_size=batch_size)
+        policy_net_hidden = self.policy_net.initial_hiddens(batch_size=batch_size)
+        q_value_loss_1_list = []
+        q_value_loss_2_list = []
+        policy_loss_list = []
+        weights = []
         while True:
             batch_size, step_size = dynamic_batch_step_size(offset=offset)
             if not (batch_size > 0 and step_size > 0):
                 break
 
-            if offset > 0:
-                soft_q_net_1_hidden = decrease_batch_size(hidden=soft_q_net_1_hidden, batch_size=batch_size)
-                soft_q_net_2_hidden = decrease_batch_size(hidden=soft_q_net_2_hidden, batch_size=batch_size)
-                target_soft_q_net_1_hidden = decrease_batch_size(hidden=target_soft_q_net_1_hidden, batch_size=batch_size)
-                target_soft_q_net_2_hidden = decrease_batch_size(hidden=target_soft_q_net_2_hidden, batch_size=batch_size)
-                policy_net_hiddens = decrease_batch_size(hidden=policy_net_hiddens, batch_size=batch_size)
+            soft_q_net_1_hidden = decrease_hidden_batch_size(hidden=soft_q_net_1_hidden, batch_size=batch_size)
+            soft_q_net_2_hidden = decrease_hidden_batch_size(hidden=soft_q_net_2_hidden, batch_size=batch_size)
+            target_soft_q_net_1_hidden = decrease_hidden_batch_size(hidden=target_soft_q_net_1_hidden, batch_size=batch_size)
+            target_soft_q_net_2_hidden = decrease_hidden_batch_size(hidden=target_soft_q_net_2_hidden, batch_size=batch_size)
+            policy_net_hidden = decrease_hidden_batch_size(hidden=policy_net_hidden, batch_size=batch_size)
 
             # size: (step_size, batch, item_size)
             state = padded_state[offset:offset + step_size, :batch_size]
@@ -198,7 +208,7 @@ class Trainer(OriginTrainer):
             first_action = action[0].unsqueeze(dim=0).to(self.device)
 
             # Update temperature parameter
-            new_action, log_prob, _ = self.policy_net.evaluate(state, None)
+            new_action, log_prob, policy_net_hidden_out = self.policy_net.evaluate(state, policy_net_hidden)
             if auto_entropy is True:
                 alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
                 self.alpha_optimizer.zero_grad()
@@ -210,18 +220,19 @@ class Trainer(OriginTrainer):
                 alpha = 1.0
 
             # Training Q function
-            predicted_q_value_1, soft_q_net_1_hidden = self.soft_q_net_1(state, action, soft_q_net_1_hidden)
-            predicted_q_value_2, soft_q_net_2_hidden = self.soft_q_net_2(state, action, soft_q_net_2_hidden)
+            predicted_q_value_1, soft_q_net_1_hidden_out = self.soft_q_net_1(state, action, soft_q_net_1_hidden)
+            predicted_q_value_2, soft_q_net_2_hidden_out = self.soft_q_net_2(state, action, soft_q_net_2_hidden)
+
             with torch.no_grad():
-                _, _, policy_net_second_state_hidden = self.policy_net.evaluate(first_state, policy_net_hiddens)
+                _, _, policy_net_second_state_hidden = self.policy_net.evaluate(first_state, policy_net_hidden)
                 new_next_action, next_log_prob, _ = self.policy_net.evaluate(next_state, policy_net_second_state_hidden)
 
                 _, target_soft_q_net_1_second_state_hidden = self.target_soft_q_net_1(first_state, first_action, target_soft_q_net_1_hidden)
                 _, target_soft_q_net_2_second_state_hidden = self.target_soft_q_net_2(first_state, first_action, target_soft_q_net_2_hidden)
                 target_q_value_1, _ = self.target_soft_q_net_1(next_state, new_next_action, target_soft_q_net_1_second_state_hidden)
                 target_q_value_2, _ = self.target_soft_q_net_1(next_state, new_next_action, target_soft_q_net_2_second_state_hidden)
-                _, target_soft_q_net_1_hidden = self.soft_q_net_1(state, action, target_soft_q_net_1_hidden)
-                _, target_soft_q_net_2_hidden = self.soft_q_net_2(state, action, target_soft_q_net_2_hidden)
+                _, target_soft_q_net_1_hidden_out = self.soft_q_net_1(state, action, target_soft_q_net_1_hidden)
+                _, target_soft_q_net_2_hidden_out = self.soft_q_net_2(state, action, target_soft_q_net_2_hidden)
                 target_q_min = torch.min(target_q_value_1, target_q_value_2)
                 target_q_min -= alpha * next_log_prob
                 target_q_value = reward + (1 - done) * gamma * target_q_min
@@ -234,19 +245,38 @@ class Trainer(OriginTrainer):
             self.soft_q_optimizer.step()
 
             # Training policy function
-            predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action, soft_q_net_1_hidden)[0],
-                                              self.soft_q_net_2(state, new_action, soft_q_net_1_hidden)[0]).detach()
+            predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action, detach_hidden(hidden=soft_q_net_1_hidden))[0],
+                                              self.soft_q_net_2(state, new_action, detach_hidden(hidden=soft_q_net_2_hidden))[0])
             policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
 
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
             self.policy_optimizer.step()
 
+            soft_q_net_1_hidden = detach_hidden(hidden=soft_q_net_1_hidden_out)
+            soft_q_net_2_hidden = detach_hidden(hidden=soft_q_net_2_hidden_out)
+            target_soft_q_net_1_hidden = detach_hidden(hidden=target_soft_q_net_1_hidden_out)
+            target_soft_q_net_2_hidden = detach_hidden(hidden=target_soft_q_net_2_hidden_out)
+            policy_net_hidden = detach_hidden(hidden=policy_net_hidden_out)
+
             offset += step_size
+            q_value_loss_1_list.append(q_value_loss_1.item())
+            q_value_loss_2_list.append(q_value_loss_2.item())
+            policy_loss_list.append(policy_loss.item())
+            weights.append(batch_size * step_size)
 
         # Soft update the target value net
         for target_param, param in zip(self.target_soft_q_net_1.parameters(), self.soft_q_net_1.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
         for target_param, param in zip(self.target_soft_q_net_2.parameters(), self.soft_q_net_2.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
-        return q_value_loss_1.item(), q_value_loss_2.item(), policy_loss.item()
+
+        q_value_loss_1_list = np.asanyarray(q_value_loss_1_list)
+        q_value_loss_2_list = np.asanyarray(q_value_loss_2_list)
+        policy_loss_list = np.asanyarray(policy_loss_list)
+        weights = np.asanyarray(weights)
+        weights = weights / weights.sum()
+        q_value_loss_1 = (weights * q_value_loss_1_list).sum()
+        q_value_loss_2 = (weights * q_value_loss_2_list).sum()
+        policy_loss = (weights * policy_loss_list).sum()
+        return q_value_loss_1, q_value_loss_2, policy_loss
