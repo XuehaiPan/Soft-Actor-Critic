@@ -78,5 +78,5 @@ class PolicyNetwork(VanillaNeuralNetwork):
         action = action.cpu().numpy()[0]
         return action
 
-    def sample_action(self):
+    def random_action(self):
         return np.random.uniform(low=-1, high=1, size=self.action_dim)

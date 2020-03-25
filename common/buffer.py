@@ -15,7 +15,7 @@ class ReplayBuffer(object):
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
 
-        # size: (batch, item_size)
+        # size: (batch_size, item_size)
         # state, action, reward, next_state, done
         return tuple(map(torch.FloatTensor, map(np.stack, zip(*batch))))
 
@@ -41,6 +41,6 @@ class TrajectoryReplayBuffer(ReplayBuffer):
         if enforce_sorted:
             batch.sort(key=lambda trajectory: len(trajectory[0]), reverse=True)
 
-        # size: (batch, seq_len, item_size)
+        # size: (batch_size, seq_len, item_size)
         # batch_trajectory_{state, action, reward, next_state, done}
         return tuple(map(lambda item_list: list(map(torch.FloatTensor, item_list)), zip(*batch)))

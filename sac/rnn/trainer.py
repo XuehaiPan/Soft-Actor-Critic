@@ -88,7 +88,7 @@ class Trainer(OriginalTrainer):
                         pass
                 for step in range(max_episode_steps):
                     if random_sample:
-                        action = self.policy_net.sample_action()
+                        action = self.policy_net.random_action()
                     else:
                         action, hidden = self.policy_net.get_action(state, hidden, deterministic=deterministic)
                     next_state, reward, done, _ = self.env.step(action)
@@ -157,13 +157,13 @@ class Trainer(OriginalTrainer):
 
         self.train()
 
-        # size: (batch, seq_len, item_size)
+        # size: (batch_size, seq_len, item_size)
         batch_trajectory_state, batch_trajectory_action, batch_trajectory_reward, \
         batch_trajectory_next_state, batch_trajectory_done = self.replay_buffer.sample(batch_size, enforce_sorted=True)
 
         lengths = np.asanyarray([trajectory_state.size(0) for trajectory_state in batch_trajectory_state], dtype=np.int64)
 
-        # size: (seq_len, batch, item_size)
+        # size: (seq_len, batch_size, item_size)
         padded_state = pad_sequence(batch_trajectory_state).to(self.device)
         padded_next_state = pad_sequence(batch_trajectory_next_state).to(self.device)
         padded_action = pad_sequence(batch_trajectory_action).to(self.device)
@@ -198,14 +198,14 @@ class Trainer(OriginalTrainer):
             target_soft_q_net_2_hidden = decrease_hidden_batch_size(hidden=target_soft_q_net_2_hidden, batch_size=batch_size)
             policy_net_hidden = decrease_hidden_batch_size(hidden=policy_net_hidden, batch_size=batch_size)
 
-            # size: (step_size, batch, item_size)
+            # size: (step_size, batch_size, item_size)
             state = padded_state[offset:offset + step_size, :batch_size]
             next_state = padded_next_state[offset:offset + step_size, :batch_size]
             action = padded_action[offset:offset + step_size, :batch_size]
             reward = padded_reward[offset:offset + step_size, :batch_size]
             done = padded_done[offset:offset + step_size, :batch_size]
 
-            # size: (1, batch, item_size)
+            # size: (1, batch_size, item_size)
             first_state = state[0].unsqueeze(dim=0).to(self.device)
             first_action = action[0].unsqueeze(dim=0).to(self.device)
 

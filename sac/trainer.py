@@ -78,7 +78,7 @@ class Trainer(object):
                         pass
                 for step in range(max_episode_steps):
                     if random_sample:
-                        action = self.policy_net.sample_action()
+                        action = self.policy_net.random_action()
                     else:
                         action = self.policy_net.get_action(state, deterministic=deterministic)
                     next_state, reward, done, _ = self.env.step(action)
@@ -119,7 +119,7 @@ class Trainer(object):
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
         self.train()
 
-        # size: (batch, item_size)
+        # size: (batch_size, item_size)
         state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
                                                             self.replay_buffer.sample(batch_size)))
 
@@ -134,7 +134,8 @@ class Trainer(object):
             self.alpha_optimizer.zero_grad()
             alpha_loss.backward()
             self.alpha_optimizer.step()
-            alpha = self.log_alpha.exp()
+            with torch.no_grad():
+                alpha = self.log_alpha.exp()
         else:
             alpha = 1.0
 
@@ -145,8 +146,8 @@ class Trainer(object):
             new_next_action, next_log_prob = self.policy_net.evaluate(next_state)
 
             target_q_min = torch.min(self.target_soft_q_net_1(next_state, new_next_action),
-                                     self.target_soft_q_net_2(next_state, new_next_action)) \
-                           - alpha * next_log_prob
+                                     self.target_soft_q_net_2(next_state, new_next_action))
+            target_q_min -= alpha * next_log_prob
             target_q_value = reward + (1 - done) * gamma * target_q_min
         q_value_loss_1 = self.soft_q_criterion_1(predicted_q_value_1, target_q_value)
         q_value_loss_2 = self.soft_q_criterion_2(predicted_q_value_2, target_q_value)
