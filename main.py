@@ -48,8 +48,8 @@ rnn_group.add_argument('--max-step-size', type=int, default=32,
                        help='max continuous steps for update (default: 32)')
 parser.add_argument('--max-episodes', type=int, default=1000,
                     help='max learning episodes (default: 1000)')
-parser.add_argument('--max-episode-steps', type=int, default=1000,
-                    help='max steps per episode (default: 1000)')
+parser.add_argument('--max-episode-steps', type=int, default=10000,
+                    help='max steps per episode (default: 10000)')
 parser.add_argument('--n-updates', type=int, default=32,
                     help='number of learning updates after sample a new episode (default: 32)')
 parser.add_argument('--batch-size', type=int, default=256,
@@ -69,6 +69,8 @@ parser.add_argument('--checkpoint-dir', type=str, default=os.path.join(ROOT_DIR,
 parser.add_argument('--load-checkpoint', action='store_true',
                     help='load latest checkpoint in checkpoint dir')
 args = parser.parse_args()
+
+MODE = args.mode
 
 USE_LSTM = (args.net == 'RNN')
 if USE_LSTM:
@@ -122,7 +124,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
 CHECKPOINT_REGEX = re.compile(r'^(.*/)?[\w-]*-(?P<epoch>\d+)\.pkl$')
-if args.load_checkpoint:
+if MODE == 'test' or args.load_checkpoint:
     INITIAL_CHECKPOINT = max(glob.iglob(os.path.join(CHECKPOINT_DIR, '*.pkl')),
                              key=lambda path: int(CHECKPOINT_REGEX.search(path).group('epoch')),
                              default=None)
@@ -171,9 +173,8 @@ def main():
 
     if INITIAL_CHECKPOINT is not None:
         trainer.load_model(path=INITIAL_CHECKPOINT)
-        trainer.train()
 
-    if INITIAL_EPISODES < MAX_EPISODES:
+    if MODE == 'train' and INITIAL_EPISODES < MAX_EPISODES:
         while trainer.replay_buffer.size < 10 * BATCH_SIZE:
             trainer.env_sample(n_episodes=1,
                                max_episode_steps=MAX_EPISODE_STEPS,
@@ -211,7 +212,32 @@ def main():
             writer.flush()
             if epoch % 50 == 0:
                 trainer.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
+    elif MODE == 'test':
+        trainer.env_sample(n_episodes=MAX_EPISODES,
+                           max_episode_steps=MAX_EPISODE_STEPS,
+                           deterministic=DETERMINISTIC,
+                           random_sample=False,
+                           render=RENDER,
+                           writer=writer)
+        episode_steps = np.asanyarray(trainer.episode_steps)
+        episode_rewards = np.asanyarray(trainer.episode_rewards)
+        average_reward = episode_rewards / episode_steps
+        writer.add_histogram(tag='histogram/cumulative_reward', values=episode_rewards)
+        writer.add_histogram(tag='histogram/average_reward', values=average_reward)
+        writer.add_histogram(tag='histogram/episode_steps', values=episode_steps)
 
+        try:
+            import pandas as pd
+            df = pd.DataFrame({
+                'Metrics': ['Cumulative Reward', 'Average Reward', 'Episode Steps'],
+                'Mean': list(map(np.mean, [episode_rewards, average_reward, episode_steps])),
+                'Std': list(map(np.std, [episode_rewards, average_reward, episode_steps])),
+            })
+            print(df.to_string(index=False))
+        except ImportError:
+            pass
+
+    writer.close()
     ENV.close()
 
 

@@ -24,6 +24,7 @@ class Trainer(OriginalTrainer):
         self.replay_buffer = TrajectoryReplayBuffer(capacity=buffer_capacity)
         self.n_episodes = 0
         self.episode_steps = []
+        self.episode_rewards = []
         self.total_steps = 0
 
         self.state_dim = state_dim
@@ -114,6 +115,7 @@ class Trainer(OriginalTrainer):
                 if not random_sample:
                     self.n_episodes += 1
                     self.episode_steps.append(episode_steps)
+                    self.episode_rewards.append(episode_reward)
                     self.total_steps += episode_steps
                     average_reward = episode_reward / episode_steps
                     if writer is not None:
