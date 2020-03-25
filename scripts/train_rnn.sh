@@ -16,7 +16,7 @@ python3 main.py --mode train --gpu 0 --env "$ENV" \
 	--hidden-dims-after-lstm 128 128 \
 	--skip-connection \
 	--max-episodes 10000 --max-episode-steps 500 \
-	--n-updates 4 --batch-size 16 --max-step-size 20 \
-	--buffer-capacity 1000000 --lr 1E-3 --weight-decay 1E-5 --random-seed 0 \
+	--n-updates 8 --batch-size 16 --step-size 16 \
+	--buffer-capacity 1000 --lr 1E-3 --weight-decay 1E-5 --random-seed 0 \
 	--log-dir "logs/$ENV/RNN" \
 	--checkpoint-dir "checkpoints/$ENV/RNN"

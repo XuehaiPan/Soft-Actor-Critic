@@ -3,10 +3,12 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from common.network_base import VanillaLSTMNetwork
+from common.network_base import VanillaLSTMNetwork, LSTMHidden
 
 
 DEVICE_CPU = torch.device('cpu')
+
+cat_hidden = LSTMHidden.cat
 
 
 class ValueNetwork(VanillaLSTMNetwork):
@@ -17,6 +19,7 @@ class ValueNetwork(VanillaLSTMNetwork):
                          n_dims_lstm_hidden=hidden_dims_lstm,
                          n_dims_after_lstm=[*hidden_dims_after_lstm, 1],
                          skip_connection=skip_connection,
+                         trainable_initial_hidden=False,
                          activation=activation,
                          output_activation=None,
                          device=device)
@@ -35,6 +38,7 @@ class SoftQNetwork(VanillaLSTMNetwork):
                          n_dims_lstm_hidden=hidden_dims_lstm,
                          n_dims_after_lstm=[*hidden_dims_after_lstm, 1],
                          skip_connection=skip_connection,
+                         trainable_initial_hidden=False,
                          activation=activation,
                          output_activation=None,
                          device=device)
@@ -54,6 +58,7 @@ class PolicyNetwork(VanillaLSTMNetwork):
                          n_dims_lstm_hidden=hidden_dims_lstm,
                          n_dims_after_lstm=[*hidden_dims_after_lstm, 2 * action_dim],
                          skip_connection=skip_connection,
+                         trainable_initial_hidden=False,
                          activation=activation,
                          output_activation=None,
                          device=device)

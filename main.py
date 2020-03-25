@@ -44,8 +44,8 @@ rnn_group.add_argument('--hidden-dims-after-lstm', type=int, default=[512], narg
                        help='hidden FC dimensions after LSTM')
 rnn_group.add_argument('--skip-connection', action='store_true', default=False,
                        help='add skip connection beside LSTM')
-rnn_group.add_argument('--max-step-size', type=int, default=32,
-                       help='max continuous steps for update (default: 32)')
+rnn_group.add_argument('--step-size', type=int, default=16,
+                       help='number of continuous steps for update (default: 16)')
 parser.add_argument('--max-episodes', type=int, default=1000,
                     help='max learning episodes (default: 1000)')
 parser.add_argument('--max-episode-steps', type=int, default=10000,
@@ -78,7 +78,7 @@ if USE_LSTM:
     HIDDEN_DIMS_AFTER_LSTM = args.hidden_dims_after_lstm
     HIDDEN_DIMS_LSTM = args.hidden_dims_lstm
     SKIP_CONNECTION = args.skip_connection
-    MAX_STEP_SIZE = args.max_step_size
+    STEP_SIZE = args.step_size
 else:
     HIDDEN_DIMS = args.hidden_dims
 
@@ -152,6 +152,7 @@ def main():
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
                           device=DEVICE)
+        initial_random_sample = True
     else:
         from sac.rnn.trainer import Trainer
         trainer = Trainer(env=ENV,
@@ -168,7 +169,8 @@ def main():
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
                           device=DEVICE)
-        update_kwargs.update({'max_step_size': MAX_STEP_SIZE})
+        initial_random_sample = False
+        update_kwargs.update({'step_size': STEP_SIZE})
     trainer.print_info()
 
     if INITIAL_CHECKPOINT is not None:
@@ -178,8 +180,9 @@ def main():
         while trainer.replay_buffer.size < 10 * BATCH_SIZE:
             trainer.env_sample(n_episodes=1,
                                max_episode_steps=MAX_EPISODE_STEPS,
-                               random_sample=True,
-                               render=RENDER)
+                               random_sample=initial_random_sample,
+                               render=RENDER,
+                               writer=writer)
         global_step = 0
         for epoch in range(INITIAL_EPISODES + 1, MAX_EPISODES + 1):
             trainer.env_sample(n_episodes=1,
@@ -210,7 +213,7 @@ def main():
                                                   ('policy_loss', np.mean(policy_loss_list))]))
 
             writer.flush()
-            if epoch % 50 == 0:
+            if epoch % 100 == 0:
                 trainer.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
     elif MODE == 'test':
         trainer.env_sample(n_episodes=MAX_EPISODES,
