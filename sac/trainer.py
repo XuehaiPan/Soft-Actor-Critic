@@ -85,7 +85,7 @@ class Trainer(object):
                         pass
                 for step in range(max_episode_steps):
                     if random_sample:
-                        action = self.policy_net.random_action()
+                        action = self.env.action_space.sample()
                     else:
                         encoded_state = self.state_encoder.encode(state)
                         action = self.policy_net.get_action(encoded_state, deterministic=deterministic)

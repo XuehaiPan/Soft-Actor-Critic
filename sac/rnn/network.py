@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.distributions import Normal
@@ -98,9 +97,6 @@ class PolicyNetwork(VanillaRecurrentNeuralNetwork):
                 action = torch.tanh(mean + std * z)
         action = action.cpu().numpy()[0, 0]
         return action, hidden
-
-    def random_action(self):
-        return np.random.uniform(low=-1, high=1, size=self.action_dim)
 
 
 class EncoderWrapper(OriginalEncoderWrapper):

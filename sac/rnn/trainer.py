@@ -97,7 +97,7 @@ class Trainer(OriginalTrainer):
                     hiddens.append(hidden)
 
                     if random_sample:
-                        action = self.policy_net.random_action()
+                        action = self.env.action_space.sample()
                     else:
                         encoded_state = self.state_encoder.encode(state)
                         action, hidden = self.policy_net.get_action(encoded_state, hidden, deterministic=deterministic)
