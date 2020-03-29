@@ -8,12 +8,12 @@ import torch.optim as optim
 import tqdm
 
 from common.buffer import TrajectoryReplayBuffer
-from sac.rnn.network import SoftQNetwork, PolicyNetwork, cat_hidden
+from sac.rnn.network import SoftQNetwork, PolicyNetwork, cat_hidden, EncoderWrapper
 from sac.trainer import Trainer as OriginalTrainer
 
 
 class Trainer(OriginalTrainer):
-    def __init__(self, env, state_dim, action_dim,
+    def __init__(self, env, state_encoder, state_dim, action_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                  skip_connection, activation,
                  soft_q_lr, policy_lr, alpha_lr, weight_decay,
@@ -30,6 +30,8 @@ class Trainer(OriginalTrainer):
         self.action_dim = action_dim
 
         self.training = True
+
+        self.state_encoder = EncoderWrapper(state_encoder, device=device)
 
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim,
                                          hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
@@ -50,9 +52,10 @@ class Trainer(OriginalTrainer):
                                         hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                                         activation=F.relu, device=device)
 
-        self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, requires_grad=True, device=device))
+        self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, device=device), requires_grad=True)
 
         self.modules = nn.ModuleDict({
+            'state_encoder': self.state_encoder,
             'soft_q_net_1': self.soft_q_net_1,
             'soft_q_net_2': self.soft_q_net_2,
             'target_soft_q_net_1': self.target_soft_q_net_1,
@@ -64,9 +67,13 @@ class Trainer(OriginalTrainer):
         self.soft_q_criterion_1 = nn.MSELoss()
         self.soft_q_criterion_2 = nn.MSELoss()
 
-        self.soft_q_optimizer = optim.Adam(itertools.chain(self.soft_q_net_1.parameters(), self.soft_q_net_2.parameters()),
+        self.soft_q_optimizer = optim.Adam(itertools.chain(self.state_encoder.parameters(),
+                                                           self.soft_q_net_1.parameters(),
+                                                           self.soft_q_net_2.parameters()),
                                            lr=soft_q_lr, weight_decay=weight_decay)
-        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
+        self.policy_optimizer = optim.Adam(itertools.chain(self.state_encoder.parameters(),
+                                                           self.policy_net.parameters()),
+                                           lr=policy_lr, weight_decay=weight_decay)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
     def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False, writer=None):
@@ -92,7 +99,8 @@ class Trainer(OriginalTrainer):
                     if random_sample:
                         action = self.policy_net.random_action()
                     else:
-                        action, hidden = self.policy_net.get_action(state, hidden, deterministic=deterministic)
+                        encoded_state = self.state_encoder.encode(state)
+                        action, hidden = self.policy_net.get_action(encoded_state, hidden, deterministic=deterministic)
                     next_state, reward, done, _ = self.env.step(action)
                     if render:
                         try:
@@ -137,6 +145,10 @@ class Trainer(OriginalTrainer):
         state, action, reward, next_state, done, hidden = tuple(map(lambda tensor: tensor.to(self.device),
                                                                     self.replay_buffer.sample(batch_size, step_size=step_size)))
 
+        state = self.state_encoder(state)
+        with torch.no_grad():
+            next_state = self.state_encoder(next_state)
+
         # size: (1, batch_size, item_size)
         first_state = state[0].unsqueeze(dim=0)
         first_action = action[0].unsqueeze(dim=0)
@@ -175,10 +187,10 @@ class Trainer(OriginalTrainer):
             target_q_value = reward + (1 - done) * gamma * target_q_min
         q_value_loss_1 = self.soft_q_criterion_1(predicted_q_value_1, target_q_value)
         q_value_loss_2 = self.soft_q_criterion_2(predicted_q_value_2, target_q_value)
+        q_value_loss = (q_value_loss_1 + q_value_loss_2) / 2.0
 
         self.soft_q_optimizer.zero_grad()
-        q_value_loss_1.backward()
-        q_value_loss_2.backward()
+        q_value_loss.backward(retain_graph=True)
         self.soft_q_optimizer.step()
 
         # Training policy function

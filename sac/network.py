@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from common.network_base import VanillaNeuralNetwork
+from common.network_base import NetworkBase, VanillaNeuralNetwork
 
 
 DEVICE_CPU = torch.device('cpu')
@@ -80,3 +80,23 @@ class PolicyNetwork(VanillaNeuralNetwork):
 
     def random_action(self):
         return np.random.uniform(low=-1, high=1, size=self.action_dim)
+
+
+class EncoderWrapper(NetworkBase):
+    def __init__(self, encoder, device):
+        super().__init__()
+
+        self.encoder = encoder
+        self.device = device
+
+        self.to(device)
+
+    def forward(self, *input, **kwargs):
+        return self.encoder.forward(*input, **kwargs)
+
+    def encode(self, input):
+        with torch.no_grad():
+            input = torch.FloatTensor(input).unsqueeze(dim=0).to(self.device)
+            encoded = self(input)
+        encoded = encoded.cpu().numpy()[0]
+        return encoded

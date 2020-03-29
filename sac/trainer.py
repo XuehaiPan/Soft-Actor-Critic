@@ -6,11 +6,11 @@ import torch.optim as optim
 import tqdm
 
 from common.buffer import ReplayBuffer
-from sac.network import SoftQNetwork, PolicyNetwork
+from sac.network import SoftQNetwork, PolicyNetwork, EncoderWrapper
 
 
 class Trainer(object):
-    def __init__(self, env, state_dim, action_dim, hidden_dims, activation,
+    def __init__(self, env, state_encoder, state_dim, action_dim, hidden_dims, activation,
                  soft_q_lr, policy_lr, alpha_lr, weight_decay,
                  buffer_capacity, device):
         self.env = env
@@ -26,6 +26,8 @@ class Trainer(object):
 
         self.training = True
 
+        self.state_encoder = EncoderWrapper(state_encoder, device=device)
+
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
         self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
         self.target_soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
@@ -35,9 +37,10 @@ class Trainer(object):
 
         self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
 
-        self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, requires_grad=True, device=device))
+        self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, device=device), requires_grad=True)
 
         self.modules = nn.ModuleDict({
+            'state_encoder': self.state_encoder,
             'soft_q_net_1': self.soft_q_net_1,
             'soft_q_net_2': self.soft_q_net_2,
             'target_soft_q_net_1': self.target_soft_q_net_1,
@@ -49,9 +52,13 @@ class Trainer(object):
         self.soft_q_criterion_1 = nn.MSELoss()
         self.soft_q_criterion_2 = nn.MSELoss()
 
-        self.soft_q_optimizer = optim.Adam(itertools.chain(self.soft_q_net_1.parameters(), self.soft_q_net_2.parameters()),
+        self.soft_q_optimizer = optim.Adam(itertools.chain(self.state_encoder.parameters(),
+                                                           self.soft_q_net_1.parameters(),
+                                                           self.soft_q_net_2.parameters()),
                                            lr=soft_q_lr, weight_decay=weight_decay)
-        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr, weight_decay=weight_decay)
+        self.policy_optimizer = optim.Adam(itertools.chain(self.state_encoder.parameters(),
+                                                           self.policy_net.parameters()),
+                                           lr=policy_lr, weight_decay=weight_decay)
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
     def print_info(self):
@@ -80,7 +87,8 @@ class Trainer(object):
                     if random_sample:
                         action = self.policy_net.random_action()
                     else:
-                        action = self.policy_net.get_action(state, deterministic=deterministic)
+                        encoded_state = self.state_encoder.encode(state)
+                        action = self.policy_net.get_action(encoded_state, deterministic=deterministic)
                     next_state, reward, done, _ = self.env.step(action)
                     if render:
                         try:
@@ -123,6 +131,10 @@ class Trainer(object):
         state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
                                                             self.replay_buffer.sample(batch_size)))
 
+        state = self.state_encoder(state)
+        with torch.no_grad():
+            next_state = self.state_encoder(next_state)
+
         # Normalize rewards
         if normalize_rewards:
             reward = (reward - reward.mean()) / (reward.std() + epsilon)
@@ -151,10 +163,10 @@ class Trainer(object):
             target_q_value = reward + (1 - done) * gamma * target_q_min
         q_value_loss_1 = self.soft_q_criterion_1(predicted_q_value_1, target_q_value)
         q_value_loss_2 = self.soft_q_criterion_2(predicted_q_value_2, target_q_value)
+        q_value_loss = (q_value_loss_1 + q_value_loss_2) / 2.0
 
         self.soft_q_optimizer.zero_grad()
-        q_value_loss_1.backward()
-        q_value_loss_2.backward()
+        q_value_loss.backward(retain_graph=True)
         self.soft_q_optimizer.step()
 
         # Training policy function

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 
 from common.network_base import VanillaRecurrentNeuralNetwork, LSTMHidden
+from sac.network import EncoderWrapper as OriginalEncoderWrapper
 
 
 DEVICE_CPU = torch.device('cpu')
@@ -100,3 +101,12 @@ class PolicyNetwork(VanillaRecurrentNeuralNetwork):
 
     def random_action(self):
         return np.random.uniform(low=-1, high=1, size=self.action_dim)
+
+
+class EncoderWrapper(OriginalEncoderWrapper):
+    def encode(self, input):
+        with torch.no_grad():
+            input = torch.FloatTensor(input).unsqueeze(dim=0).unsqueeze(dim=0).to(self.device)
+            encoded = self(input)
+        encoded = encoded.cpu().numpy()[0, 0]
+        return encoded

@@ -9,6 +9,7 @@ from datetime import datetime
 import gym
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -137,11 +138,14 @@ else:
 
 
 def main():
+    state_encoder = nn.Identity()
+
     writer = SummaryWriter(log_dir=LOG_DIR)
     update_kwargs = {}
     if not USE_LSTM:
         from sac.trainer import Trainer
         trainer = Trainer(env=ENV,
+                          state_encoder=state_encoder,
                           state_dim=ENV.observation_space.shape[0],
                           action_dim=ENV.action_space.shape[0],
                           hidden_dims=HIDDEN_DIMS,
@@ -156,6 +160,7 @@ def main():
     else:
         from sac.rnn.trainer import Trainer
         trainer = Trainer(env=ENV,
+                          state_encoder=state_encoder,
                           state_dim=ENV.observation_space.shape[0],
                           action_dim=ENV.action_space.shape[0],
                           hidden_dims_before_lstm=HIDDEN_DIMS_BEFORE_LSTM,
