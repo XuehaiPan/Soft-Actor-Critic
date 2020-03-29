@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from common.network_base import VanillaLSTMNetwork, LSTMHidden
+from common.network_base import VanillaRecurrentNeuralNetwork, LSTMHidden
 
 
 DEVICE_CPU = torch.device('cpu')
@@ -11,7 +11,7 @@ DEVICE_CPU = torch.device('cpu')
 cat_hidden = LSTMHidden.cat
 
 
-class ValueNetwork(VanillaLSTMNetwork):
+class ValueNetwork(VanillaRecurrentNeuralNetwork):
     def __init__(self, state_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                  activation=F.relu, device=DEVICE_CPU):
@@ -30,7 +30,7 @@ class ValueNetwork(VanillaLSTMNetwork):
         return super().forward(state, hidden)
 
 
-class SoftQNetwork(VanillaLSTMNetwork):
+class SoftQNetwork(VanillaRecurrentNeuralNetwork):
     def __init__(self, state_dim, action_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                  activation=F.relu, device=DEVICE_CPU):
@@ -50,7 +50,7 @@ class SoftQNetwork(VanillaLSTMNetwork):
         return super().forward(torch.cat([state, action], dim=-1), hidden)
 
 
-class PolicyNetwork(VanillaLSTMNetwork):
+class PolicyNetwork(VanillaRecurrentNeuralNetwork):
     def __init__(self, state_dim, action_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                  activation=F.relu, device=DEVICE_CPU, log_std_min=-20, log_std_max=2):

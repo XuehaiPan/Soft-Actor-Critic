@@ -94,7 +94,7 @@ class LSTMHidden(object):
         return LSTMHidden(hidden=new_hidden)
 
 
-class VanillaLSTMNetwork(NetworkBase):
+class VanillaRecurrentNeuralNetwork(NetworkBase):
     def __init__(self, n_dims_before_lstm, n_dims_lstm_hidden, n_dims_after_lstm,
                  skip_connection, trainable_initial_hidden=True, activation=F.relu,
                  output_activation=None, device=DEVICE_CPU):
@@ -168,3 +168,69 @@ class VanillaLSTMNetwork(NetworkBase):
     def initial_hiddens(self, batch_size=1):
         init_hidden = LSTMHidden(hidden=list(zip(self.init_hiddens, self.init_cells)))
         return init_hidden.repeat(1, batch_size, 1)
+
+
+class VanillaConvolutionalNetwork(NetworkBase):
+    def __init__(self, input_channels, output_dim,
+                 n_hidden_channels, kernel_sizes, strides, paddings,
+                 batch_normalization, activation=F.relu,
+                 output_activation=None, device=DEVICE_CPU):
+        assert len(n_hidden_channels) == len(kernel_sizes)
+        assert len(n_hidden_channels) == len(strides)
+        assert len(n_hidden_channels) == len(paddings)
+
+        super().__init__()
+        self.device = device
+
+        n_hidden_channels = [input_channels, *n_hidden_channels, output_dim]
+        kernel_sizes = [*kernel_sizes, 1]
+        strides = [*strides, 1]
+        paddings = [*paddings, 0]
+
+        self.activation = activation
+        self.output_activation = output_activation
+
+        self.conv_layers = nn.ModuleList()
+        for i in range(len(n_hidden_channels) - 1):
+            self.conv_layers.append(module=nn.Conv2d(n_hidden_channels[i],
+                                                     n_hidden_channels[i + 1],
+                                                     kernel_size=kernel_sizes[i],
+                                                     stride=strides[i],
+                                                     padding=paddings[i],
+                                                     bias=True))
+
+        self.batch_normalization = batch_normalization
+        if batch_normalization:
+            self.batch_norm_layers = nn.ModuleList()
+            for i in range(1, len(n_hidden_channels)):
+                self.batch_norm_layers.append(module=nn.BatchNorm2d(n_hidden_channels[i],
+                                                                    affine=True))
+
+        self.global_average_pooling_layer = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.to(device)
+
+    def forward(self, x):
+        input_size = x.size()
+        x = x.view(np.prod(input_size[:-3]), *input_size[-3:])
+
+        n_layers = len(self.conv_layers)
+        for i, conv_layer in enumerate(self.conv_layers):
+            x = conv_layer(x)
+            if self.batch_normalization:
+                x = self.batch_norm_layers[i](x)
+            if i < n_layers - 1:
+                x = self.activation(x)
+
+        x = self.global_average_pooling_layer(x)
+        x = x.view(x.size()[:-2])
+        if self.output_activation is not None:
+            x = self.output_activation(x)
+
+        x = x.view(*input_size[:-3], -1)
+        return x
+
+
+VanillaNN = VanillaNeuralNetwork
+VanillaRNN = VanillaRecurrentNeuralNetwork
+VanillaCNN = VanillaConvolutionalNetwork
