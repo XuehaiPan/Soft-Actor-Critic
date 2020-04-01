@@ -57,8 +57,15 @@ parser.add_argument('--batch-size', type=int, default=256,
                     help='batch size (default: 256)')
 parser.add_argument('--buffer-capacity', type=int, default=1000000,
                     help='capacity of replay buffer (default: 1000000)')
-parser.add_argument('--lr', type=float, default=1E-4,
-                    help='learning rate (default: 0.0001)')
+lr_group = parser.add_argument_group('learning rate')
+lr_group.add_argument('--lr', type=float, default=1E-4,
+                      help='learning rate (can be override by the following specific learning rate) (default: 0.0001)')
+lr_group.add_argument('--soft-q-lr', type=float, default=None,
+                      help='learning rate for Soft Q Networks (use LR above if not present)')
+lr_group.add_argument('--policy-lr', type=float, default=None,
+                      help='learning rate for Policy Networks (use LR above if not present)')
+lr_group.add_argument('--alpha-lr', type=float, default=None,
+                      help='learning rate for temperature parameter (use LR above if not present)')
 parser.add_argument('--weight-decay', type=float, default=0.0,
                     help='weight decay (default: 0.0)')
 parser.add_argument('--random-seed', type=int, default=0,
@@ -106,7 +113,10 @@ BATCH_SIZE = args.batch_size
 
 DETERMINISTIC = args.deterministic
 
-LEARNING_RATE = args.lr
+LR = args.lr
+SOFT_Q_LR = (args.soft_q_lr or LR)
+POLICY_LR = (args.policy_lr or LR)
+ALPHA_LR = (args.alpha_lr or LR)
 WEIGHT_DECAY = args.weight_decay
 
 if args.gpu is not None:
@@ -150,9 +160,9 @@ def main():
                           action_dim=ENV.action_space.shape[0],
                           hidden_dims=HIDDEN_DIMS,
                           activation=ACTIVATION,
-                          soft_q_lr=LEARNING_RATE,
-                          policy_lr=LEARNING_RATE,
-                          alpha_lr=LEARNING_RATE,
+                          soft_q_lr=SOFT_Q_LR,
+                          policy_lr=POLICY_LR,
+                          alpha_lr=ALPHA_LR,
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
                           device=DEVICE)
@@ -168,9 +178,9 @@ def main():
                           hidden_dims_after_lstm=HIDDEN_DIMS_AFTER_LSTM,
                           activation=ACTIVATION,
                           skip_connection=SKIP_CONNECTION,
-                          soft_q_lr=LEARNING_RATE,
-                          policy_lr=LEARNING_RATE,
-                          alpha_lr=LEARNING_RATE,
+                          soft_q_lr=SOFT_Q_LR,
+                          policy_lr=POLICY_LR,
+                          alpha_lr=ALPHA_LR,
                           weight_decay=WEIGHT_DECAY,
                           buffer_capacity=BUFFER_CAPACITY,
                           device=DEVICE)
@@ -196,25 +206,25 @@ def main():
                                random_sample=False,
                                render=RENDER,
                                writer=writer)
-            q_value_loss_list = []
+            soft_q_loss_list = []
             policy_loss_list = []
             with tqdm.trange(N_UPDATES, desc=f'Training {epoch}/{MAX_EPISODES}') as pbar:
                 for i in pbar:
-                    q_value_loss_1, q_value_loss_2, policy_loss = trainer.update(batch_size=BATCH_SIZE,
-                                                                                 normalize_rewards=True,
-                                                                                 auto_entropy=True,
-                                                                                 target_entropy=-1.0 * trainer.action_dim,
-                                                                                 soft_tau=0.01,
-                                                                                 **update_kwargs)
+                    soft_q_loss_1, soft_q_loss_2, policy_loss = trainer.update(batch_size=BATCH_SIZE,
+                                                                               normalize_rewards=True,
+                                                                               auto_entropy=True,
+                                                                               target_entropy=-1.0 * trainer.action_dim,
+                                                                               soft_tau=0.01,
+                                                                               **update_kwargs)
                     global_step += 1
-                    q_value_loss_list.append(q_value_loss_1)
-                    q_value_loss_list.append(q_value_loss_2)
+                    soft_q_loss_list.append(soft_q_loss_1)
+                    soft_q_loss_list.append(soft_q_loss_2)
                     policy_loss_list.append(policy_loss)
-                    writer.add_scalar(tag='train/q_value_loss_1', scalar_value=q_value_loss_1, global_step=global_step)
-                    writer.add_scalar(tag='train/q_value_loss_2', scalar_value=q_value_loss_2, global_step=global_step)
+                    writer.add_scalar(tag='train/soft_q_loss_1', scalar_value=soft_q_loss_1, global_step=global_step)
+                    writer.add_scalar(tag='train/soft_q_loss_2', scalar_value=soft_q_loss_2, global_step=global_step)
                     writer.add_scalar(tag='train/policy_loss', scalar_value=policy_loss, global_step=global_step)
                     pbar.set_postfix(OrderedDict([('global_step', global_step),
-                                                  ('q_value_loss', np.mean(q_value_loss_list)),
+                                                  ('soft_q_loss', np.mean(soft_q_loss_list)),
                                                   ('policy_loss', np.mean(policy_loss_list))]))
 
             writer.flush()
@@ -246,8 +256,12 @@ def main():
             pass
 
     writer.close()
-    ENV.close()
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except:
+        raise
+    finally:
+        ENV.close()
