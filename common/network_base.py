@@ -5,6 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+__all__ = [
+    'NetworkBase',
+    'VanillaNeuralNetwork', 'VanillaNN',
+    'VanillaRecurrentNeuralNetwork', 'VanillaRNN', 'LSTMHidden',
+    'VanillaConvolutionalNetwork', 'VanillaCNN'
+]
+
 DEVICE_CPU = torch.device('cpu')
 
 

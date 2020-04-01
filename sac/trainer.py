@@ -9,6 +9,9 @@ from common.buffer import ReplayBuffer
 from sac.network import SoftQNetwork, PolicyNetwork, EncoderWrapper
 
 
+__all__ = ['Trainer']
+
+
 class Trainer(object):
     def __init__(self, env, state_encoder, state_dim, action_dim, hidden_dims, activation,
                  soft_q_lr, policy_lr, alpha_lr, weight_decay,
@@ -34,6 +37,8 @@ class Trainer(object):
         self.target_soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
         self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
         self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
+        self.target_soft_q_net_1.eval()
+        self.target_soft_q_net_2.eval()
 
         self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=device)
 
@@ -77,7 +82,7 @@ class Trainer(object):
             for episode in range(n_episodes):
                 episode_reward = 0
                 episode_steps = 0
-                state = self.env.reset()
+                observation = self.env.reset()
                 if render:
                     try:
                         self.env.render()
@@ -87,9 +92,9 @@ class Trainer(object):
                     if random_sample:
                         action = self.env.action_space.sample()
                     else:
-                        encoded_state = self.state_encoder.encode(state)
-                        action = self.policy_net.get_action(encoded_state, deterministic=deterministic)
-                    next_state, reward, done, _ = self.env.step(action)
+                        state = self.state_encoder.encode(observation)
+                        action = self.policy_net.get_action(state, deterministic=deterministic)
+                    next_observation, reward, done, _ = self.env.step(action)
                     if render:
                         try:
                             self.env.render()
@@ -98,8 +103,8 @@ class Trainer(object):
 
                     episode_reward += reward
                     episode_steps += 1
-                    self.replay_buffer.push(state, action, [reward], next_state, [done])
-                    state = next_state
+                    self.replay_buffer.push(observation, action, [reward], next_observation, [done])
+                    observation = next_observation
 
                     pbar.set_postfix({'buffer_size': self.replay_buffer.size})
                     pbar.update()
@@ -128,12 +133,12 @@ class Trainer(object):
         self.train()
 
         # size: (batch_size, item_size)
-        state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.to(self.device),
-                                                            self.replay_buffer.sample(batch_size)))
+        observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.to(self.device),
+                                                                        self.replay_buffer.sample(batch_size)))
 
-        state = self.state_encoder(state)
+        state = self.state_encoder(observation)
         with torch.no_grad():
-            next_state = self.state_encoder(next_state)
+            next_state = self.state_encoder(next_observation)
 
         # Normalize rewards
         if normalize_rewards:
@@ -190,6 +195,8 @@ class Trainer(object):
 
     def load_model(self, path):
         self.modules.load_state_dict(torch.load(path, map_location=self.device))
+        self.target_soft_q_net_1.eval()
+        self.target_soft_q_net_2.eval()
 
     def train(self, mode=True):
         self.training = mode

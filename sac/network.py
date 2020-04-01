@@ -5,6 +5,8 @@ from torch.distributions import Normal
 from common.network_base import NetworkBase, VanillaNeuralNetwork
 
 
+__all__ = ['ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'EncoderWrapper']
+
 DEVICE_CPU = torch.device('cpu')
 
 
@@ -90,9 +92,9 @@ class EncoderWrapper(NetworkBase):
     def forward(self, *input, **kwargs):
         return self.encoder.forward(*input, **kwargs)
 
-    def encode(self, input):
+    def encode(self, observation):
         with torch.no_grad():
-            input = torch.FloatTensor(input).unsqueeze(dim=0).to(self.device)
-            encoded = self(input)
+            observation = torch.FloatTensor(observation).unsqueeze(dim=0).to(self.device)
+            encoded = self(observation)
         encoded = encoded.cpu().numpy()[0]
         return encoded

@@ -6,6 +6,8 @@ from common.network_base import VanillaRecurrentNeuralNetwork, LSTMHidden
 from sac.network import EncoderWrapper as OriginalEncoderWrapper
 
 
+__all__ = ['ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'EncoderWrapper']
+
 DEVICE_CPU = torch.device('cpu')
 
 cat_hidden = LSTMHidden.cat
@@ -100,9 +102,9 @@ class PolicyNetwork(VanillaRecurrentNeuralNetwork):
 
 
 class EncoderWrapper(OriginalEncoderWrapper):
-    def encode(self, input):
+    def encode(self, observation):
         with torch.no_grad():
-            input = torch.FloatTensor(input).unsqueeze(dim=0).unsqueeze(dim=0).to(self.device)
-            encoded = self(input)
+            observation = torch.FloatTensor(observation).unsqueeze(dim=0).unsqueeze(dim=0).to(self.device)
+            encoded = self(observation)
         encoded = encoded.cpu().numpy()[0, 0]
         return encoded

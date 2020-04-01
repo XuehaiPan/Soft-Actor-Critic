@@ -8,6 +8,9 @@ import torch.nn.utils.rnn
 from common.network_base import LSTMHidden
 
 
+__all__ = ['ReplayBuffer', 'TrajectoryReplayBuffer']
+
+
 class ReplayBuffer(object):
     def __init__(self, capacity=None):
         self.buffer = deque(maxlen=capacity)
@@ -19,7 +22,7 @@ class ReplayBuffer(object):
         batch = random.sample(self.buffer, batch_size)
 
         # size: (batch_size, item_size)
-        # state, action, reward, next_state, done
+        # observation, action, reward, next_observation, done
         return tuple(map(torch.FloatTensor, map(np.stack, zip(*batch))))
 
     def __len__(self):
@@ -51,22 +54,22 @@ class TrajectoryReplayBuffer(ReplayBuffer):
         hiddens = []
         for i in range(batch_size):
             while True:
-                (state, action, reward, next_state, done, hidden), = random.choices(self.buffer, weights=self.lengths)
-                if len(state) >= step_size:
-                    offset = random.randint(0, len(state) - step_size)
-                    batch.append((state[offset:offset + step_size],
+                (observation, action, reward, next_observation, done, hidden), = random.choices(self.buffer, weights=self.lengths)
+                if len(observation) >= step_size:
+                    offset = random.randint(0, len(observation) - step_size)
+                    batch.append((observation[offset:offset + step_size],
                                   action[offset:offset + step_size],
                                   reward[offset:offset + step_size],
-                                  next_state[offset:offset + step_size],
+                                  next_observation[offset:offset + step_size],
                                   done[offset:offset + step_size]))
                     hiddens.append(hidden[offset].unsqueeze(dim=0))
                     break
 
         # size: (batch_size, seq_len, item_size)
-        # state, action, reward, next_state, done
+        # observation, action, reward, next_observation, done
         batch = map(torch.FloatTensor, map(np.stack, zip(*batch)))
 
         # size: (seq_len, batch_size, item_size)
-        state, action, reward, next_state, done = tuple(map(lambda tensor: tensor.transpose(0, 1), batch))
+        observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.transpose(0, 1), batch))
         hidden = LSTMHidden.cat(hiddens=hiddens, dim=1)
-        return state, action, reward, next_state, done, hidden
+        return observation, action, reward, next_observation, done, hidden

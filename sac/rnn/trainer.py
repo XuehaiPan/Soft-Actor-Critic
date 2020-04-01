@@ -12,6 +12,9 @@ from sac.rnn.network import SoftQNetwork, PolicyNetwork, cat_hidden, EncoderWrap
 from sac.trainer import Trainer as OriginalTrainer
 
 
+__all__ = ['Trainer']
+
+
 class Trainer(OriginalTrainer):
     def __init__(self, env, state_encoder, state_dim, action_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
@@ -47,6 +50,8 @@ class Trainer(OriginalTrainer):
                                                 activation=activation, device=device)
         self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
         self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
+        self.target_soft_q_net_1.eval()
+        self.target_soft_q_net_2.eval()
 
         self.policy_net = PolicyNetwork(state_dim, action_dim,
                                         hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
@@ -87,7 +92,7 @@ class Trainer(OriginalTrainer):
                 trajectory = []
                 hiddens = []
                 hidden = self.policy_net.initial_hiddens(batch_size=1)
-                state = self.env.reset()
+                observation = self.env.reset()
                 if render:
                     try:
                         self.env.render()
@@ -99,9 +104,9 @@ class Trainer(OriginalTrainer):
                     if random_sample:
                         action = self.env.action_space.sample()
                     else:
-                        encoded_state = self.state_encoder.encode(state)
-                        action, hidden = self.policy_net.get_action(encoded_state, hidden, deterministic=deterministic)
-                    next_state, reward, done, _ = self.env.step(action)
+                        state = self.state_encoder.encode(observation)
+                        action, hidden = self.policy_net.get_action(state, hidden, deterministic=deterministic)
+                    next_observation, reward, done, _ = self.env.step(action)
                     if render:
                         try:
                             self.env.render()
@@ -110,8 +115,8 @@ class Trainer(OriginalTrainer):
 
                     episode_reward += reward
                     episode_steps += 1
-                    trajectory.append((state, action, [reward], next_state, [done]))
-                    state = next_state
+                    trajectory.append((observation, action, [reward], next_observation, [done]))
+                    observation = next_observation
 
                     pbar.update()
                     if done:
@@ -142,12 +147,12 @@ class Trainer(OriginalTrainer):
         self.train()
 
         # size: (seq_len, batch_size, item_size)
-        state, action, reward, next_state, done, hidden = tuple(map(lambda tensor: tensor.to(self.device),
-                                                                    self.replay_buffer.sample(batch_size, step_size=step_size)))
+        observation, action, reward, next_observation, done, hidden = tuple(map(lambda tensor: tensor.to(self.device),
+                                                                                self.replay_buffer.sample(batch_size, step_size=step_size)))
 
-        state = self.state_encoder(state)
+        state = self.state_encoder(observation)
         with torch.no_grad():
-            next_state = self.state_encoder(next_state)
+            next_state = self.state_encoder(next_observation)
 
         # size: (1, batch_size, item_size)
         first_state = state[0].unsqueeze(dim=0)

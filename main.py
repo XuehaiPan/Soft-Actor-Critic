@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-from common.environment import NormalizedActions
+from common.environment import NormalizedAction
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description='Train or test Soft Actor-Critic co
 parser.add_argument('--mode', type=str, choices=['train', 'test'], default='train',
                     help='mode (default: train)')
 parser.add_argument('--gpu', type=int, nargs='?', const=0, default=None, metavar='CUDA_DEVICE',
-                    help='center GPU device (use CPU when not present)')
+                    help='center GPU device (use CPU if not present)')
 parser.add_argument('--env', type=str, default='BipedalWalker-v3',
                     help='environment to train on (default: BipedalWalker-v3)')
 parser.add_argument('--render', action='store_true',
@@ -52,7 +52,7 @@ parser.add_argument('--max-episodes', type=int, default=1000,
 parser.add_argument('--max-episode-steps', type=int, default=10000,
                     help='max steps per episode (default: 10000)')
 parser.add_argument('--n-updates', type=int, default=32,
-                    help='number of learning updates after sample a new episode (default: 32)')
+                    help='number of learning updates after sampling a new episode (default: 32)')
 parser.add_argument('--batch-size', type=int, default=256,
                     help='batch size (default: 256)')
 parser.add_argument('--buffer-capacity', type=int, default=1000000,
@@ -89,7 +89,7 @@ else:
     ACTIVATION = F.leaky_relu
 
 ENV_NAME = args.env
-ENV = NormalizedActions(gym.make(ENV_NAME))
+ENV = NormalizedAction(gym.make(ENV_NAME))
 MAX_EPISODE_STEPS = args.max_episode_steps
 try:
     MAX_EPISODE_STEPS = min(MAX_EPISODE_STEPS, ENV.spec.max_episode_steps)
