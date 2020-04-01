@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-from common.environment import NormalizedAction
+from common.environment import FlattenedAction, NormalizedAction, FlattenedObservation
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -89,7 +89,9 @@ else:
     ACTIVATION = F.leaky_relu
 
 ENV_NAME = args.env
-ENV = NormalizedAction(gym.make(ENV_NAME))
+ENV = NormalizedAction(FlattenedAction(FlattenedObservation(gym.make(ENV_NAME))))
+STATE_DIM = ENV.observation_space.shape[0]
+STATE_ENCODER = nn.Identity()
 MAX_EPISODE_STEPS = args.max_episode_steps
 try:
     MAX_EPISODE_STEPS = min(MAX_EPISODE_STEPS, ENV.spec.max_episode_steps)
@@ -138,15 +140,13 @@ else:
 
 
 def main():
-    state_encoder = nn.Identity()
-
     writer = SummaryWriter(log_dir=LOG_DIR)
     update_kwargs = {}
     if not USE_LSTM:
         from sac.trainer import Trainer
         trainer = Trainer(env=ENV,
-                          state_encoder=state_encoder,
-                          state_dim=ENV.observation_space.shape[0],
+                          state_encoder=STATE_ENCODER,
+                          state_dim=STATE_DIM,
                           action_dim=ENV.action_space.shape[0],
                           hidden_dims=HIDDEN_DIMS,
                           activation=ACTIVATION,
@@ -160,8 +160,8 @@ def main():
     else:
         from sac.rnn.trainer import Trainer
         trainer = Trainer(env=ENV,
-                          state_encoder=state_encoder,
-                          state_dim=ENV.observation_space.shape[0],
+                          state_encoder=STATE_ENCODER,
+                          state_dim=STATE_DIM,
                           action_dim=ENV.action_space.shape[0],
                           hidden_dims_before_lstm=HIDDEN_DIMS_BEFORE_LSTM,
                           hidden_dims_lstm=HIDDEN_DIMS_LSTM,
