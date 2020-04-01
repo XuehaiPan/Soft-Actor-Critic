@@ -19,6 +19,7 @@ python3 main.py --mode train --gpu 0 --env "$ENV" \
 	--n-updates 16 --batch-size 16 --step-size 16 \
 	--buffer-capacity 1000 \
 	--soft-q-lr 1E-3 --policy-lr 1E-4 --alpha-lr 1E-3 \
+	--initial-alpha 1.0 --auto-entropy \
 	--weight-decay 1E-5 --random-seed 0 \
 	--log-dir "logs/$ENV/RNN" \
 	--checkpoint-dir "checkpoints/$ENV/RNN"

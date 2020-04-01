@@ -19,7 +19,7 @@ class Trainer(OriginalTrainer):
     def __init__(self, env, state_encoder, state_dim, action_dim,
                  hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
                  skip_connection, activation,
-                 soft_q_lr, policy_lr, alpha_lr, weight_decay,
+                 initial_alpha, soft_q_lr, policy_lr, alpha_lr, weight_decay,
                  buffer_capacity, device):
         self.env = env
         self.device = device
@@ -57,7 +57,7 @@ class Trainer(OriginalTrainer):
                                         hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm, skip_connection,
                                         activation=F.relu, device=device)
 
-        self.log_alpha = nn.Parameter(torch.zeros(1, dtype=torch.float32, device=device), requires_grad=True)
+        self.log_alpha = nn.Parameter(torch.tensor([np.log(initial_alpha)], dtype=torch.float32, device=device), requires_grad=True)
 
         self.modules = nn.ModuleDict({
             'state_encoder': self.state_encoder,
@@ -170,10 +170,8 @@ class Trainer(OriginalTrainer):
             self.alpha_optimizer.zero_grad()
             alpha_loss.backward()
             self.alpha_optimizer.step()
-            with torch.no_grad():
-                alpha = self.log_alpha.exp()
-        else:
-            alpha = 1.0
+        with torch.no_grad():
+            alpha = self.log_alpha.exp()
 
         # Training Q function
         predicted_q_value_1, _ = self.soft_q_net_1(state, action, hidden)
@@ -208,4 +206,4 @@ class Trainer(OriginalTrainer):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
         for target_param, param in zip(self.target_soft_q_net_2.parameters(), self.soft_q_net_2.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - soft_tau) + param.data * soft_tau)
-        return soft_q_loss_1.item(), soft_q_loss_2.item(), policy_loss.item()
+        return soft_q_loss.item(), policy_loss.item(), alpha.item()

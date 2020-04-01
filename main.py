@@ -64,8 +64,13 @@ lr_group.add_argument('--soft-q-lr', type=float, default=None,
                       help='learning rate for Soft Q Networks (use LR above if not present)')
 lr_group.add_argument('--policy-lr', type=float, default=None,
                       help='learning rate for Policy Networks (use LR above if not present)')
-lr_group.add_argument('--alpha-lr', type=float, default=None,
-                      help='learning rate for temperature parameter (use LR above if not present)')
+alpha_group = parser.add_argument_group('temperature parameter')
+alpha_group.add_argument('--alpha-lr', type=float, default=None,
+                         help='learning rate for temperature parameter (use LR above if not present)')
+alpha_group.add_argument('--initial-alpha', type=float, default=1.0,
+                         help='initial value of temperature parameter (default: 1.0)')
+alpha_group.add_argument('--auto-entropy', action='store_true',
+                         help='auto update temperature parameter while training')
 parser.add_argument('--weight-decay', type=float, default=0.0,
                     help='weight decay (default: 0.0)')
 parser.add_argument('--random-seed', type=int, default=0,
@@ -117,7 +122,10 @@ LR = args.lr
 SOFT_Q_LR = (args.soft_q_lr or LR)
 POLICY_LR = (args.policy_lr or LR)
 ALPHA_LR = (args.alpha_lr or LR)
+
+INITIAL_ALPHA = args.initial_alpha
 WEIGHT_DECAY = args.weight_decay
+AUTO_ENTROPY = args.auto_entropy
 
 if args.gpu is not None:
     DEVICE = torch.device(f'cuda:{args.gpu}' if torch.cuda.is_available() else 'cpu')
@@ -160,6 +168,7 @@ def main():
                           action_dim=ENV.action_space.shape[0],
                           hidden_dims=HIDDEN_DIMS,
                           activation=ACTIVATION,
+                          initial_alpha=INITIAL_ALPHA,
                           soft_q_lr=SOFT_Q_LR,
                           policy_lr=POLICY_LR,
                           alpha_lr=ALPHA_LR,
@@ -178,6 +187,7 @@ def main():
                           hidden_dims_after_lstm=HIDDEN_DIMS_AFTER_LSTM,
                           activation=ACTIVATION,
                           skip_connection=SKIP_CONNECTION,
+                          initial_alpha=INITIAL_ALPHA,
                           soft_q_lr=SOFT_Q_LR,
                           policy_lr=POLICY_LR,
                           alpha_lr=ALPHA_LR,
@@ -210,19 +220,18 @@ def main():
             policy_loss_list = []
             with tqdm.trange(N_UPDATES, desc=f'Training {epoch}/{MAX_EPISODES}') as pbar:
                 for i in pbar:
-                    soft_q_loss_1, soft_q_loss_2, policy_loss = trainer.update(batch_size=BATCH_SIZE,
-                                                                               normalize_rewards=True,
-                                                                               auto_entropy=True,
-                                                                               target_entropy=-1.0 * trainer.action_dim,
-                                                                               soft_tau=0.01,
-                                                                               **update_kwargs)
+                    soft_q_loss, policy_loss, alpha = trainer.update(batch_size=BATCH_SIZE,
+                                                                     normalize_rewards=True,
+                                                                     auto_entropy=AUTO_ENTROPY,
+                                                                     target_entropy=-1.0 * trainer.action_dim,
+                                                                     soft_tau=0.01,
+                                                                     **update_kwargs)
                     global_step += 1
-                    soft_q_loss_list.append(soft_q_loss_1)
-                    soft_q_loss_list.append(soft_q_loss_2)
+                    soft_q_loss_list.append(soft_q_loss)
                     policy_loss_list.append(policy_loss)
-                    writer.add_scalar(tag='train/soft_q_loss_1', scalar_value=soft_q_loss_1, global_step=global_step)
-                    writer.add_scalar(tag='train/soft_q_loss_2', scalar_value=soft_q_loss_2, global_step=global_step)
+                    writer.add_scalar(tag='train/soft_q_loss', scalar_value=soft_q_loss, global_step=global_step)
                     writer.add_scalar(tag='train/policy_loss', scalar_value=policy_loss, global_step=global_step)
+                    writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha, global_step=global_step)
                     pbar.set_postfix(OrderedDict([('global_step', global_step),
                                                   ('soft_q_loss', np.mean(soft_q_loss_list)),
                                                   ('policy_loss', np.mean(policy_loss_list))]))
