@@ -15,6 +15,7 @@ import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from common.environment import FlattenedAction, NormalizedAction, FlattenedObservation
+from common.network_base import VanillaNeuralNetwork
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,24 +30,29 @@ parser.add_argument('--env', type=str, default='BipedalWalker-v3',
 parser.add_argument('--render', action='store_true',
                     help='render the environment')
 parser.add_argument('--net', type=str, choices=['FC', 'RNN'], default='FC',
-                    help='network architecture')
+                    help='architecture of controller network')
 parser.add_argument('--activation', type=str, choices=['ReLU', 'LeakyReLU'], default='ReLU',
                     help='activation function in networks (default: ReLU)')
 parser.add_argument('--deterministic', action='store_true', help='deterministic in evaluation')
-fc_group = parser.add_argument_group('FC')
+fc_group = parser.add_argument_group('FC controller')
 fc_group.add_argument('--hidden-dims', type=int, default=[512], nargs='+',
-                      help='hidden dimensions')
-rnn_group = parser.add_argument_group('RNN')
+                      help='hidden dimensions of FC controller')
+rnn_group = parser.add_argument_group('RNN controller')
 rnn_group.add_argument('--hidden-dims-before-lstm', type=int, default=[512], nargs='+',
-                       help='hidden FC dimensions before LSTM')
+                       help='hidden FC dimensions before LSTM layers in RNN controller')
 rnn_group.add_argument('--hidden-dims-lstm', type=int, default=[512], nargs='+',
-                       help='LSTM hidden dimensions')
+                       help='LSTM hidden dimensions of RNN controller')
 rnn_group.add_argument('--hidden-dims-after-lstm', type=int, default=[512], nargs='+',
-                       help='hidden FC dimensions after LSTM')
+                       help='hidden FC dimensions after LSTM layers in RNN controller')
 rnn_group.add_argument('--skip-connection', action='store_true', default=False,
-                       help='add skip connection beside LSTM')
+                       help='add skip connection beside LSTM layers in RNN controller')
 rnn_group.add_argument('--step-size', type=int, default=16,
                        help='number of continuous steps for update (default: 16)')
+encoder_group = parser.add_argument_group('state encoder')
+encoder_group.add_argument('--state-dim', type=int, default=None,
+                           help='target state dimension of encoded state (use env.observation_space.shape if not present)')
+encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs='+',
+                           help='hidden dimensions of FC state encoder')
 parser.add_argument('--max-episodes', type=int, default=1000,
                     help='max learning episodes (default: 1000)')
 parser.add_argument('--max-episode-steps', type=int, default=10000,
@@ -102,8 +108,13 @@ else:
 
 ENV_NAME = args.env
 ENV = NormalizedAction(FlattenedAction(FlattenedObservation(gym.make(ENV_NAME))))
-STATE_DIM = ENV.observation_space.shape[0]
-STATE_ENCODER = nn.Identity()
+ENV_OBSERVATION_DIM = ENV.observation_space.shape[0]
+STATE_DIM = (args.state_dim or ENV_OBSERVATION_DIM)
+if args.state_dim is not None or len(args.encoder_hidden_dims) > 0:
+    STATE_ENCODER = VanillaNeuralNetwork(n_dims=[ENV_OBSERVATION_DIM, *args.encoder_hidden_dims, STATE_DIM],
+                                         activation=ACTIVATION, output_activation=None)
+else:
+    STATE_ENCODER = nn.Identity()
 MAX_EPISODE_STEPS = args.max_episode_steps
 try:
     MAX_EPISODE_STEPS = min(MAX_EPISODE_STEPS, ENV.spec.max_episode_steps)

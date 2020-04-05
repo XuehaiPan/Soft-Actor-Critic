@@ -11,11 +11,14 @@ cd "$ROOT_DIR"
 
 python3 main.py --mode test --gpu 0 --env "$ENV" \
 	--net RNN --activation LeakyReLU \
-	--hidden-dims-before-lstm 256 256 256 128 128 \
+	--hidden-dims-before-lstm 256 \
 	--hidden-dims-lstm 128 \
-	--hidden-dims-after-lstm 128 128 \
+	--hidden-dims-after-lstm 128 \
 	--skip-connection \
+	--state-dim 256 \
+	--encoder-hidden-dims 256 256 128 128 \
 	--max-episodes 100 \
 	--buffer-capacity 0 --random-seed 0 \
 	--log-dir "logs/$ENV/RNN" \
-	--checkpoint-dir "checkpoints/$ENV/RNN"
+	--checkpoint-dir "checkpoints/$ENV/RNN" \
+	--load-checkpoint
