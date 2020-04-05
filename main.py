@@ -15,7 +15,8 @@ import torch.nn.functional as F
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
-from common.environment import FlattenedAction, NormalizedAction, FlattenedObservation
+from common.environment import FlattenedAction, NormalizedAction, \
+    FlattenedObservation, ConcatenatedObservation
 from common.network_base import VanillaNeuralNetwork
 
 
@@ -50,6 +51,8 @@ rnn_group.add_argument('--skip-connection', action='store_true', default=False,
 rnn_group.add_argument('--step-size', type=int, default=16,
                        help='number of continuous steps for update (default: 16)')
 encoder_group = parser.add_argument_group('state encoder')
+encoder_group.add_argument('--n-frames', type=int, default=1,
+                           help='concatenate original N consecutive observations as a new observation (default: 1)')
 encoder_group.add_argument('--state-dim', type=int, default=None,
                            help='target state dimension of encoded state (use env.observation_space.shape if not present)')
 encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs='+',
@@ -113,8 +116,11 @@ else:
 
 ENV_NAME = args.env
 ENV = NormalizedAction(FlattenedAction(FlattenedObservation(gym.make(ENV_NAME))))
+if args.n_frames > 1:
+    ENV = ConcatenatedObservation(ENV, n_frames=args.n_frames, dim=0)
 ENV_OBSERVATION_DIM = ENV.observation_space.shape[0]
 STATE_DIM = (args.state_dim or ENV_OBSERVATION_DIM)
+
 if args.state_dim is not None or len(args.encoder_hidden_dims) > 0:
     STATE_ENCODER = VanillaNeuralNetwork(n_dims=[ENV_OBSERVATION_DIM, *args.encoder_hidden_dims, STATE_DIM],
                                          activation=ACTIVATION, output_activation=None)

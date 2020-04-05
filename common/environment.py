@@ -1,9 +1,14 @@
+from collections import deque
+
 import gym
 import numpy as np
 from gym.spaces import Box
 
 
-__all__ = ['FlattenedAction', 'NormalizedAction', 'FlattenedObservation']
+__all__ = [
+    'FlattenedAction', 'NormalizedAction',
+    'FlattenedObservation', 'ConcatenatedObservation'
+]
 
 
 class FlattenedAction(gym.ActionWrapper):
@@ -56,3 +61,29 @@ class FlattenedObservation(gym.ObservationWrapper):
 
     def observation(self, observation):
         return np.ravel(observation)
+
+
+class ConcatenatedObservation(gym.ObservationWrapper):
+    def __init__(self, env, n_frames=3, dim=0):
+        super().__init__(env=env)
+
+        self.observation_space = Box(low=np.concatenate([self.env.observation_space.low] * n_frames, axis=dim),
+                                     high=np.concatenate([self.env.observation_space.high] * n_frames, axis=dim),
+                                     dtype=self.env.observation_space.dtype)
+
+        self.queue = deque(maxlen=n_frames)
+        self.dim = dim
+
+    def reset(self, **kwargs):
+        self.queue.clear()
+        return super().reset(**kwargs)
+
+    def observation(self, observation):
+        while len(self.queue) < self.n_frames - 1:
+            self.queue.append(observation)
+        self.queue.append(observation)
+        return np.concatenate(self.queue, axis=self.dim)
+
+    @property
+    def n_frames(self):
+        return self.queue.maxlen
