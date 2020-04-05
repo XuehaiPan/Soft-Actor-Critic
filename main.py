@@ -20,6 +20,8 @@ from common.environment import FlattenedAction, NormalizedAction, \
 from common.network_base import VanillaNeuralNetwork
 
 
+mp.set_start_method('spawn')
+
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser(description='Train or test Soft Actor-Critic controller.')

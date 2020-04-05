@@ -96,7 +96,7 @@ class Collector(OriginalCollector):
             if sampler_writer is not None:
                 sampler_writer.close()
 
-        cache = mp.Queue(maxsize=2 * self.n_samplers)
+        cache = self.manager.Queue(maxsize=2 * self.n_samplers)
 
         sample_processes = []
         devices = self.devices
