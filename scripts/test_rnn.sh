@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ENV="BipedalWalkerHardcore-v3"
+ENV="Pendulum-v0"
 
 ROOT_DIR="$(
 	cd "$(dirname "$(dirname "$0")")"
@@ -18,7 +18,8 @@ python3 main.py --mode test --gpu 0 --env "$ENV" \
 	--state-dim 256 \
 	--encoder-hidden-dims 256 256 128 128 \
 	--max-episodes 100 \
-	--buffer-capacity 0 --random-seed 0 \
+	--n-samplers 4 \
+	--random-seed 0 \
 	--log-dir "logs/$ENV/RNN" \
 	--checkpoint-dir "checkpoints/$ENV/RNN" \
 	--load-checkpoint

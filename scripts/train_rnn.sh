@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-ENV="BipedalWalkerHardcore-v3"
+ENV="Pendulum-v0"
 
 ROOT_DIR="$(
 	cd "$(dirname "$(dirname "$0")")"
@@ -17,9 +17,11 @@ python3 main.py --mode train --gpu 0 --env "$ENV" \
 	--skip-connection \
 	--state-dim 256 \
 	--encoder-hidden-dims 256 256 128 128 \
-	--max-episodes 20000 --max-episode-steps 500 \
-	--n-updates 16 --batch-size 16 --step-size 16 \
-	--buffer-capacity 1000 \
+	--max-episode-steps 500 \
+	--n-epochs 4000 --n-updates 256 --batch-size 16 --step-size 16 \
+	--n-samplers 4 \
+	--buffer-capacity 1000000 \
+	--update-sample-ratio 2.0 \
 	--soft-q-lr 1E-3 --policy-lr 1E-4 --alpha-lr 1E-3 \
 	--initial-alpha 1.0 --auto-entropy \
 	--weight-decay 1E-5 --random-seed 0 \
