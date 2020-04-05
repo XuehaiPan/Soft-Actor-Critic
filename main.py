@@ -60,7 +60,9 @@ encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs=
 parser.add_argument('--max-episode-steps', type=int, default=10000,
                     help='max steps per episode (default: 10000)')
 parser.add_argument('--n-epochs', type=int, default=1000,
-                    help='number of learning epochs (default: 1000)')
+                    help='number of training epochs (default: 1000)')
+parser.add_argument('--n-episodes', type=int, default=100,
+                    help='number of test episodes (default: 100)')
 parser.add_argument('--n-updates', type=int, default=32,
                     help='number of learning updates per epoch (default: 32)')
 parser.add_argument('--batch-size', type=int, default=256,
@@ -133,6 +135,7 @@ except AttributeError:
     pass
 RENDER = args.render
 
+N_EPISODES = args.n_episodes
 N_EPOCHS = args.n_epochs
 N_SAMPLERS = args.n_samplers
 BUFFER_CAPACITY = args.buffer_capacity
@@ -187,7 +190,7 @@ def main():
     model_kwargs = {}
     update_kwargs = {}
     initial_random_sample = True
-    ratio_factor = BATCH_SIZE
+    n_samples_per_update = BATCH_SIZE
     if not USE_LSTM:
         model_kwargs.update({'hidden_dims': HIDDEN_DIMS})
     else:
@@ -211,7 +214,7 @@ def main():
         else:
             from sac.rnn.model import Trainer as Model
             initial_random_sample = False
-            ratio_factor *= STEP_SIZE
+            n_samples_per_update *= STEP_SIZE
             update_kwargs.update({'step_size': STEP_SIZE})
     else:
         if not USE_LSTM:
@@ -237,22 +240,24 @@ def main():
         model.load_model(path=INITIAL_CHECKPOINT)
 
     if MODE == 'train' and INITIAL_EPOCH < N_EPOCHS:
-        while model.replay_buffer.size < 10 * ratio_factor:
-            model.env_sample(n_episodes=10,
-                             max_episode_steps=MAX_EPISODE_STEPS,
-                             deterministic=False,
-                             random_sample=initial_random_sample,
-                             render=RENDER)
+        while model.replay_buffer.size < 10 * n_samples_per_update:
+            model.sample(n_episodes=10,
+                         max_episode_steps=MAX_EPISODE_STEPS,
+                         deterministic=False,
+                         random_sample=initial_random_sample,
+                         render=RENDER,
+                         progress=True)
 
-        collector_process = model.async_env_sample(n_episodes=np.inf,
-                                                   max_episode_steps=MAX_EPISODE_STEPS,
-                                                   deterministic=False,
-                                                   random_sample=False,
-                                                   render=RENDER,
-                                                   log_dir=LOG_DIR)
+        print(f'Start parallel sampling using {N_SAMPLERS} samplers.')
+        collector_process = model.async_sample(n_episodes=np.inf,
+                                               max_episode_steps=MAX_EPISODE_STEPS,
+                                               deterministic=False,
+                                               random_sample=False,
+                                               render=RENDER,
+                                               log_dir=LOG_DIR)
 
         def train():
-            train_writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, 'model'), comment='model')
+            train_writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, 'trainer'), comment='trainer')
             n_initial_samples = model.collector.total_steps
             global_step = 0
             for epoch in range(INITIAL_EPOCH + 1, N_EPOCHS + 1):
@@ -271,7 +276,7 @@ def main():
                         global_step += 1
                         buffer_size = model.replay_buffer.size
                         try:
-                            update_sample_ratio = (ratio_factor * global_step) / (model.collector.total_steps - n_initial_samples)
+                            update_sample_ratio = (n_samples_per_update * global_step) / (model.collector.total_steps - n_initial_samples)
                         except ZeroDivisionError:
                             update_sample_ratio = UPDATE_SAMPLE_RATIO
                         soft_q_loss_list.append(soft_q_loss)
@@ -298,7 +303,7 @@ def main():
                 train_writer.add_scalar(tag='epoch/update_sample_ratio', scalar_value=np.mean(ratio_list), global_step=epoch)
 
                 train_writer.flush()
-                if epoch % 100 == 0:
+                if epoch % 2 == 0:
                     model.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
 
             train_writer.close()
@@ -317,14 +322,15 @@ def main():
     elif MODE == 'test':
         test_writer = SummaryWriter(log_dir=LOG_DIR)
 
-        model.env_sample(n_episodes=N_EPOCHS,
-                         max_episode_steps=MAX_EPISODE_STEPS,
-                         deterministic=DETERMINISTIC,
-                         random_sample=False,
-                         render=RENDER,
-                         writer=test_writer)
-        episode_steps = np.asanyarray(model.episode_steps)
-        episode_rewards = np.asanyarray(model.episode_rewards)
+        model.sample(n_episodes=N_EPISODES,
+                     max_episode_steps=MAX_EPISODE_STEPS,
+                     deterministic=DETERMINISTIC,
+                     random_sample=False,
+                     render=RENDER,
+                     log_dir=LOG_DIR,
+                     progress=True)
+        episode_steps = np.asanyarray(model.collector.episode_steps)
+        episode_rewards = np.asanyarray(model.collector.episode_rewards)
         average_reward = episode_rewards / episode_steps
         test_writer.add_histogram(tag='test/cumulative_reward', values=episode_rewards)
         test_writer.add_histogram(tag='test/average_reward', values=average_reward)

@@ -7,6 +7,7 @@ import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.optim as optim
+import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from common.buffer import ReplayBuffer
@@ -43,121 +44,132 @@ class Collector(object):
         return sum(self.episode_steps)
 
     def async_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False, log_dir=None):
-        def collect(collector, n_episodes, max_episode_steps, deterministic, random_sample, render):
-            def sample(collector, cache, n_episodes, max_episode_steps,
-                       deterministic, random_sample, render,
-                       device, random_seed, log_dir):
-                if not random_sample and log_dir is not None:
-                    sampler_writer = SummaryWriter(log_dir=log_dir, comment='sampler')
-                else:
-                    sampler_writer = None
-
-                env_local = copy.deepcopy(collector.env)
-                env_local.seed(random_seed)
-                state_encoder_local = copy.deepcopy(collector.model.state_encoder)
-                policy_net_local = copy.deepcopy(collector.model.policy_net)
-                if device is not None:
-                    state_encoder_local.to(device)
-                    policy_net_local.to(device)
-
-                episode = 0
-                while episode < n_episodes:
-                    sync_params(src_net=collector.model.state_encoder, dst_net=state_encoder_local, soft_tau=1.0)
-                    sync_params(src_net=collector.model.policy_net, dst_net=policy_net_local, soft_tau=1.0)
-                    state_encoder_local.eval()
-                    policy_net_local.eval()
-
-                    episode_reward = 0
-                    episode_steps = 0
-                    trajectory = []
-                    observation = env_local.reset()
-                    if render:
-                        try:
-                            env_local.render()
-                        except Exception:
-                            pass
-                    for step in range(max_episode_steps):
-                        if random_sample:
-                            action = env_local.action_space.sample()
-                        else:
-                            state = state_encoder_local.encode(observation)
-                            action = policy_net_local.get_action(state, deterministic=deterministic)
-                        next_observation, reward, done, _ = env_local.step(action)
-                        if render:
-                            try:
-                                env_local.render()
-                            except Exception:
-                                pass
-
-                        episode_reward += reward
-                        episode_steps += 1
-                        trajectory.append((observation, action, [reward], next_observation, [done]))
-                        observation = next_observation
-                    cache.put((episode_steps, episode_reward, trajectory))
-                    episode += 1
-                    if sampler_writer is not None:
-                        average_reward = episode_reward / episode_steps
-                        sampler_writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
-                        sampler_writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
-                        sampler_writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
-                        sampler_writer.flush()
-
-                cache.put(None)
-                if sampler_writer is not None:
-                    sampler_writer.close()
-
-            cache = mp.Queue(maxsize=2 * collector.n_samplers)
-
-            sample_processes = []
-            devices = collector.devices
-            if collector.devices is None:
-                devices = [None]
-            for i, device in zip(range(collector.n_samplers), itertools.cycle(devices)):
-                if np.isinf(n_episodes):
-                    sampler_n_episodes = np.inf
-                else:
-                    sampler_n_episodes = n_episodes // collector.n_samplers
-                    if i < n_episodes % collector.n_samplers:
-                        sampler_n_episodes += 1
-                if log_dir is not None:
-                    sampler_log_dir = os.path.join(log_dir, f'sampler_{i}')
-                else:
-                    sampler_log_dir = None
-                sample_process = mp.Process(target=sample,
-                                            args=(collector, cache, sampler_n_episodes, max_episode_steps,
-                                                  deterministic, random_sample, render,
-                                                  device, collector.random_seed + i, sampler_log_dir))
-                sample_process.start()
-                sample_processes.append(sample_process)
-
-            if not random_sample and log_dir is not None:
-                collector_writer = SummaryWriter(log_dir=os.path.join(log_dir, 'collector'), comment='collector')
-            else:
-                collector_writer = None
-            n_alive = collector.n_samplers
-            while n_alive > 0:
-                collector.running_event.wait()
-                items = cache.get()
-                if items is None:
-                    n_alive -= 1
-                    continue
-                episode_steps, episode_reward, trajectory = items
-                collector.replay_buffer.extend(trajectory)
-                collector.episode_steps.append(episode_steps)
-                collector.episode_rewards.append(episode_reward)
-                if collector_writer is not None:
-                    collector_writer.add_scalar(tag='sample/buffer_size', scalar_value=collector.replay_buffer.size,
-                                                global_step=collector.n_episodes)
-
-        collect_process = mp.Process(target=collect,
-                                     args=(self, n_episodes, max_episode_steps, deterministic, random_sample, render),
+        collect_process = mp.Process(target=self.sample,
+                                     args=(n_episodes, max_episode_steps, deterministic, random_sample, render, log_dir, False),
                                      name='collector')
         collect_process.start()
 
         return collect_process
 
-    def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False, devices=None):
-        self.async_sample(n_episodes, max_episode_steps, deterministic, random_sample, render, devices).join()
+    def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
+               render=False, log_dir=None, progress=False):
+        def sampler_target(collector, cache, n_episodes, max_episode_steps,
+                           deterministic, random_sample, render,
+                           device, random_seed, log_dir):
+            if not random_sample and log_dir is not None:
+                sampler_writer = SummaryWriter(log_dir=log_dir, comment='sampler')
+            else:
+                sampler_writer = None
+
+            env_local = copy.deepcopy(collector.env)
+            env_local.seed(random_seed)
+            state_encoder_local = copy.deepcopy(collector.model.state_encoder)
+            policy_net_local = copy.deepcopy(collector.model.policy_net)
+            if device is not None:
+                state_encoder_local.to(device)
+                policy_net_local.to(device)
+
+            episode = 0
+            while episode < n_episodes:
+                sync_params(src_net=collector.model.state_encoder, dst_net=state_encoder_local, soft_tau=1.0)
+                sync_params(src_net=collector.model.policy_net, dst_net=policy_net_local, soft_tau=1.0)
+                state_encoder_local.eval()
+                policy_net_local.eval()
+
+                episode_reward = 0
+                episode_steps = 0
+                trajectory = []
+                observation = env_local.reset()
+                if render:
+                    try:
+                        env_local.render()
+                    except Exception:
+                        pass
+                for step in range(max_episode_steps):
+                    if random_sample:
+                        action = env_local.action_space.sample()
+                    else:
+                        state = state_encoder_local.encode(observation)
+                        action = policy_net_local.get_action(state, deterministic=deterministic)
+                    next_observation, reward, done, _ = env_local.step(action)
+                    if render:
+                        try:
+                            env_local.render()
+                        except Exception:
+                            pass
+
+                    episode_reward += reward
+                    episode_steps += 1
+                    trajectory.append((observation, action, [reward], next_observation, [done]))
+                    observation = next_observation
+                cache.put((episode_steps, episode_reward, trajectory))
+                episode += 1
+                if sampler_writer is not None:
+                    average_reward = episode_reward / episode_steps
+                    sampler_writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
+                    sampler_writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
+                    sampler_writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
+                    sampler_writer.flush()
+
+            cache.put(None)
+            if sampler_writer is not None:
+                sampler_writer.close()
+
+        cache = mp.Queue(maxsize=2 * self.n_samplers)
+
+        sample_processes = []
+        devices = self.devices
+        if self.devices is None:
+            devices = [None]
+        for i, device in zip(range(self.n_samplers), itertools.cycle(devices)):
+            if np.isinf(n_episodes):
+                sampler_n_episodes = np.inf
+            else:
+                sampler_n_episodes = n_episodes // self.n_samplers
+                if i < n_episodes % self.n_samplers:
+                    sampler_n_episodes += 1
+            if log_dir is not None:
+                sampler_log_dir = os.path.join(log_dir, f'sampler_{i}')
+            else:
+                sampler_log_dir = None
+            sample_process = mp.Process(target=sampler_target,
+                                        args=(self, cache, sampler_n_episodes, max_episode_steps,
+                                              deterministic, random_sample, render,
+                                              device, self.random_seed + i, sampler_log_dir),
+                                        name=f'sampler_{i}')
+            sample_process.start()
+            sample_processes.append(sample_process)
+
+        if not random_sample and log_dir is not None:
+            collector_writer = SummaryWriter(log_dir=os.path.join(log_dir, 'collector'), comment='collector')
+        else:
+            collector_writer = None
+        n_alive = self.n_samplers
+        if progress and not np.isinf(n_episodes):
+            pbar = tqdm.tqdm(total=n_episodes, desc='Sampling')
+        else:
+            pbar = None
+        while n_alive > 0:
+            self.running_event.wait()
+            items = cache.get()
+            if items is None:
+                n_alive -= 1
+                continue
+            episode_steps, episode_reward, trajectory = items
+            self.replay_buffer.extend(trajectory)
+            self.episode_steps.append(episode_steps)
+            self.episode_rewards.append(episode_reward)
+            if pbar is not None:
+                pbar.update()
+            if collector_writer is not None:
+                collector_writer.add_scalar(tag='sample/buffer_size', scalar_value=self.replay_buffer.size,
+                                            global_step=self.n_episodes)
+
+        if pbar is not None:
+            pbar.close()
+
+        for sample_process in sample_processes:
+            sample_process.join()
 
     def pause(self):
         self.running_event.clear()
@@ -186,13 +198,13 @@ class ModelBase(object):
         self.log_alpha = nn.Parameter(torch.tensor([[np.log(initial_alpha)]], dtype=torch.float32, device=self.model_device),
                                       requires_grad=True)
 
-        self.modules = nn.ModuleDict({
-            'state_encoder': self.state_encoder,
-            'soft_q_net_1': self.soft_q_net_1,
-            'soft_q_net_2': self.soft_q_net_2,
-            'policy_net': self.policy_net,
-            'params': nn.ParameterDict({'log_alpha': self.log_alpha})
-        })
+        self.modules = nn.ModuleDict([
+            ('state_encoder', self.state_encoder),
+            ('soft_q_net_1', self.soft_q_net_1),
+            ('soft_q_net_2', self.soft_q_net_2),
+            ('policy_net', self.policy_net),
+            ('params', nn.ParameterDict({'log_alpha': self.log_alpha}))
+        ])
 
         self.modules.share_memory()
 
@@ -218,14 +230,12 @@ class ModelBase(object):
     def replay_buffer(self):
         return self.collector.replay_buffer
 
-    def env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
-                   render=False, log_dir=None):
-        self.async_env_sample(n_episodes, max_episode_steps, deterministic, random_sample,
-                              render, log_dir).join()
+    def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False, log_dir=None, progress=False):
+        self.collector.sample(n_episodes, max_episode_steps, deterministic, random_sample, render, log_dir, progress)
 
-    def async_env_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
-                         render=False, log_dir=None):
-        collector_process = self.collector.async_sample(n_episodes, max_episode_steps, deterministic, random_sample,
+    def async_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False, render=False, log_dir=None):
+        collector_process = self.collector.async_sample(n_episodes, max_episode_steps,
+                                                        deterministic, random_sample,
                                                         render, log_dir)
         return collector_process
 

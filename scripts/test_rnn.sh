@@ -17,7 +17,7 @@ python3 main.py --mode test --gpu 0 --env "$ENV" \
 	--skip-connection \
 	--state-dim 256 \
 	--encoder-hidden-dims 256 256 128 128 \
-	--max-episodes 100 \
+	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \
 	--log-dir "logs/$ENV/RNN" \
