@@ -6,7 +6,7 @@ from common.network_base import VanillaRecurrentNeuralNetwork, LSTMHidden
 from sac.network import EncoderWrapper as OriginalEncoderWrapper
 
 
-__all__ = ['ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'EncoderWrapper']
+__all__ = ['cat_hidden', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'EncoderWrapper']
 
 DEVICE_CPU = torch.device('cpu')
 
@@ -81,9 +81,10 @@ class PolicyNetwork(VanillaRecurrentNeuralNetwork):
     def evaluate(self, state, hidden=None, epsilon=1E-6):
         mean, std, hidden = self(state, hidden)
 
-        z = Normal(0, 1).sample()
-        action = torch.tanh(mean + std * z)
-        log_prob = Normal(mean, std).log_prob(mean + std * z) - torch.log(1.0 - action.pow(2) + epsilon)
+        distribution = Normal(mean, std)
+        u = distribution.rsample()
+        action = torch.tanh(u)
+        log_prob = distribution.log_prob(u) - torch.log(1.0 - action.pow(2) + epsilon)
         log_prob = log_prob.sum(dim=-1, keepdim=True)
         return action, log_prob, hidden
 

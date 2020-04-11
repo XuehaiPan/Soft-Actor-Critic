@@ -4,7 +4,6 @@ import os
 import random
 import re
 from collections import OrderedDict
-from datetime import datetime
 
 import gym
 import numpy as np
@@ -20,7 +19,10 @@ from common.environment import FlattenedAction, NormalizedAction, \
 from common.network_base import VanillaNeuralNetwork
 
 
-mp.set_start_method('spawn')
+try:
+    mp.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -103,6 +105,11 @@ args = parser.parse_args()
 
 MODE = args.mode
 
+RANDOM_SEED = args.random_seed
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+torch.manual_seed(RANDOM_SEED)
+
 USE_LSTM = (args.net == 'RNN')
 if USE_LSTM:
     HIDDEN_DIMS_BEFORE_LSTM = args.hidden_dims_before_lstm
@@ -119,7 +126,9 @@ else:
     ACTIVATION = F.leaky_relu
 
 ENV_NAME = args.env
-ENV = NormalizedAction(FlattenedAction(FlattenedObservation(gym.make(ENV_NAME))))
+ENV = gym.make(ENV_NAME)
+ENV.seed(RANDOM_SEED)
+ENV = FlattenedObservation(NormalizedAction(FlattenedAction(ENV)))
 if args.n_frames > 1:
     ENV = ConcatenatedObservation(ENV, n_frames=args.n_frames, dim=0)
 ENV_OBSERVATION_DIM = ENV.observation_space.shape[0]
@@ -145,6 +154,10 @@ N_UPDATES = args.n_updates
 BATCH_SIZE = args.batch_size
 UPDATE_SAMPLE_RATIO = args.update_sample_ratio
 
+N_SAMPLES_PER_UPDATE = BATCH_SIZE
+if USE_LSTM:
+    N_SAMPLES_PER_UPDATE *= STEP_SIZE
+
 DETERMINISTIC = args.deterministic
 
 LR = args.lr
@@ -169,8 +182,7 @@ np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 ENV.seed(RANDOM_SEED)
 
-CURRENT_TIME = datetime.now().strftime('%Y-%m-%d-%T')
-LOG_DIR = os.path.join(args.log_dir, CURRENT_TIME)
+LOG_DIR = args.log_dir
 CHECKPOINT_DIR = args.checkpoint_dir
 os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
@@ -242,25 +254,27 @@ def main():
         model.load_model(path=INITIAL_CHECKPOINT)
 
     if MODE == 'train' and INITIAL_EPOCH < N_EPOCHS:
+        print(f'Sampling...')
         while model.replay_buffer.size < 10 * n_samples_per_update:
             model.sample(n_episodes=10,
                          max_episode_steps=MAX_EPISODE_STEPS,
                          deterministic=False,
                          random_sample=initial_random_sample,
-                         render=RENDER,
-                         progress=True)
+                         render=RENDER)
 
-        print(f'Start parallel sampling using {N_SAMPLERS} samplers.')
-        collector_process = model.async_sample(n_episodes=np.inf,
-                                               max_episode_steps=MAX_EPISODE_STEPS,
-                                               deterministic=False,
-                                               random_sample=False,
-                                               render=RENDER,
-                                               log_dir=LOG_DIR)
+        print(f'Start parallel sampling using {N_SAMPLERS} samplers at {tuple(map(str, model.collector.devices))}.')
+        samplers = model.async_sample(n_episodes=np.inf,
+                                      max_episode_steps=MAX_EPISODE_STEPS,
+                                      deterministic=False,
+                                      random_sample=False,
+                                      render=RENDER,
+                                      log_dir=LOG_DIR)
 
-        def train():
+        try:
             train_writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, 'trainer'), comment='trainer')
             n_initial_samples = model.collector.total_steps
+            while model.collector.total_steps == n_initial_samples:
+                pass
             global_step = 0
             for epoch in range(INITIAL_EPOCH + 1, N_EPOCHS + 1):
                 soft_q_loss_list = []
@@ -293,6 +307,7 @@ def main():
                         pbar.set_postfix(OrderedDict([('global_step', global_step),
                                                       ('soft_q_loss', np.mean(soft_q_loss_list)),
                                                       ('policy_loss', np.mean(policy_loss_list)),
+                                                      ('n_samples', model.collector.total_steps),
                                                       ('update_sample_ratio', update_sample_ratio)]))
                         if update_sample_ratio < UPDATE_SAMPLE_RATIO:
                             model.collector.pause()
@@ -309,17 +324,15 @@ def main():
                     model.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
 
             train_writer.close()
-
-        trainer_process = mp.Process(target=train)
-
-        try:
-            trainer_process.start()
-            trainer_process.join()
-        except:
+        except KeyboardInterrupt:
+            pass
+        except Exception:
             raise
         finally:
-            collector_process.terminate()
-            collector_process.join()
+            for sampler in samplers:
+                if sampler.is_alive():
+                    sampler.terminate()
+                sampler.join()
 
     elif MODE == 'test':
         test_writer = SummaryWriter(log_dir=LOG_DIR)
@@ -355,7 +368,9 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except:
+    except KeyboardInterrupt:
+        pass
+    except Exception:
         raise
     finally:
         ENV.close()

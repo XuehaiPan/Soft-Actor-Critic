@@ -9,7 +9,7 @@ ROOT_DIR="$(
 
 cd "$ROOT_DIR"
 
-python3 main.py --mode train --gpu 0 --env "$ENV" \
+PYTHONWARNINGS=ignore python3 main.py --mode train --gpu 0 1 2 3 4 --env "$ENV" \
 	--net FC --activation LeakyReLU \
 	--hidden-dims 256 \
 	--state-dim 256 \

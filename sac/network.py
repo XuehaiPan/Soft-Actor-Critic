@@ -60,9 +60,10 @@ class PolicyNetwork(VanillaNeuralNetwork):
     def evaluate(self, state, epsilon=1E-6):
         mean, std = self(state)
 
-        z = Normal(0, 1).sample()
-        action = torch.tanh(mean + std * z)
-        log_prob = Normal(mean, std).log_prob(mean + std * z) - torch.log(1.0 - action.pow(2) + epsilon)
+        distribution = Normal(mean, std)
+        u = distribution.rsample()
+        action = torch.tanh(u)
+        log_prob = distribution.log_prob(u) - torch.log(1.0 - action.pow(2) + epsilon)
         log_prob = log_prob.sum(dim=-1, keepdim=True)
         return action, log_prob
 
