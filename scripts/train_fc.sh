@@ -11,9 +11,9 @@ cd "$ROOT_DIR"
 
 PYTHONWARNINGS=ignore python3 main.py --mode train --gpu 0 1 2 3 4 --env "$ENV" \
 	--net FC --activation LeakyReLU \
-	--hidden-dims 256 \
+	--hidden-dims 256 256 128 128 \
 	--state-dim 256 \
-	--encoder-hidden-dims 256 256 128 128 \
+	--encoder-hidden-dims 256 128 \
 	--max-episode-steps 500 \
 	--n-epochs 4000 --n-updates 256 --batch-size 256 \
 	--n-samplers 4 \
