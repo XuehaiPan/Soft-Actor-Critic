@@ -52,6 +52,7 @@ class SoftQNetwork(VanillaRecurrentNeuralNetwork):
         self.action_scaler = nn.Linear(in_features=action_dim, out_features=action_dim, bias=True)
         nn.init.eye_(self.action_scaler.weight)
         nn.init.zeros_(self.action_scaler.bias)
+        self.action_scaler.to(self.device)
 
     def forward(self, state, action, hidden=None):
         return super().forward(torch.cat([state, self.action_scaler(action)], dim=-1), hidden)
