@@ -9,7 +9,8 @@ ROOT_DIR="$(
 
 cd "$ROOT_DIR"
 
-python3 main.py --mode test --gpu 0 --env "$ENV" \
+PYTHONWARNINGS=ignore python3 main.py \
+	--mode test --gpu 0 1 2 3 --env "$ENV" \
 	--net RNN --activation LeakyReLU \
 	--hidden-dims-before-lstm 128 \
 	--hidden-dims-lstm 128 \

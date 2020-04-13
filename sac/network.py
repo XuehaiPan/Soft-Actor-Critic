@@ -5,7 +5,7 @@ from torch.distributions import Normal
 from common.network_base import NetworkBase, VanillaNeuralNetwork
 
 
-__all__ = ['ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'EncoderWrapper']
+__all__ = ['ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'StateEncoderWrapper']
 
 DEVICE_CPU = torch.device('cpu')
 
@@ -81,7 +81,7 @@ class PolicyNetwork(VanillaNeuralNetwork):
         return action
 
 
-class EncoderWrapper(NetworkBase):
+class StateEncoderWrapper(NetworkBase):
     def __init__(self, encoder, device):
         super().__init__()
 

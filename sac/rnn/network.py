@@ -3,10 +3,10 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 
 from common.network_base import VanillaRecurrentNeuralNetwork, LSTMHidden
-from sac.network import EncoderWrapper as OriginalEncoderWrapper
+from sac.network import StateEncoderWrapper as OriginalStateEncoderWrapper
 
 
-__all__ = ['cat_hidden', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'EncoderWrapper']
+__all__ = ['cat_hidden', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'StateEncoderWrapper']
 
 DEVICE_CPU = torch.device('cpu')
 
@@ -102,7 +102,7 @@ class PolicyNetwork(VanillaRecurrentNeuralNetwork):
         return action, hidden
 
 
-class EncoderWrapper(OriginalEncoderWrapper):
+class StateEncoderWrapper(OriginalStateEncoderWrapper):
     def encode(self, observation):
         with torch.no_grad():
             observation = torch.FloatTensor(observation).unsqueeze(dim=0).unsqueeze(dim=0).to(self.device)

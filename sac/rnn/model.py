@@ -12,8 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from common.buffer import TrajectoryReplayBuffer
 from common.utils import sync_params
 from sac.model import Collector, ModelBase as OriginalModelBase
-from sac.network import SoftQNetwork, PolicyNetwork, EncoderWrapper
-from sac.rnn.network import SoftQNetwork, PolicyNetwork, cat_hidden, EncoderWrapper
+from sac.rnn.network import SoftQNetwork, PolicyNetwork, cat_hidden, StateEncoderWrapper
 
 
 __all__ = ['Collector', 'ModelBase', 'Trainer', 'Tester']
@@ -137,7 +136,7 @@ class ModelBase(OriginalModelBase):
 
         self.training = True
 
-        self.state_encoder = EncoderWrapper(state_encoder, device=self.model_device)
+        self.state_encoder = StateEncoderWrapper(state_encoder, device=self.model_device)
 
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim,
                                          hidden_dims_before_lstm, hidden_dims_lstm, hidden_dims_after_lstm,
@@ -201,7 +200,9 @@ class Trainer(ModelBase):
         self.policy_loss_weight = policy_lr / soft_q_lr
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
-    def update(self, batch_size, step_size=16, normalize_rewards=True, auto_entropy=True, target_entropy=-2.0,
+    def update(self, batch_size, step_size=16,
+               normalize_rewards=True, reward_scale=1.0,
+               adaptive_entropy=True, target_entropy=-2.0,
                gamma=0.99, soft_tau=1E-2, epsilon=1E-6):
         self.train()
 
@@ -221,11 +222,11 @@ class Trainer(ModelBase):
         # Normalize rewards
         if normalize_rewards:
             with torch.no_grad():
-                reward = (reward - reward.mean()) / (reward.std() + epsilon)
+                reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
 
         # Update temperature parameter
         new_action, log_prob, _ = self.policy_net.evaluate(state, first_hidden)
-        if auto_entropy is True:
+        if adaptive_entropy is True:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
             alpha_loss.backward()

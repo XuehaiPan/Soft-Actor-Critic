@@ -9,7 +9,8 @@ ROOT_DIR="$(
 
 cd "$ROOT_DIR"
 
-PYTHONWARNINGS=ignore python3 main.py --mode train --gpu 0 1 2 3 4 --env "$ENV" \
+PYTHONWARNINGS=ignore python3 main.py \
+	--mode train --gpu 0 1 2 3 4 --env "$ENV" \
 	--net RNN --activation LeakyReLU \
 	--hidden-dims-before-lstm 128 \
 	--hidden-dims-lstm 128 \
@@ -22,8 +23,10 @@ PYTHONWARNINGS=ignore python3 main.py --mode train --gpu 0 1 2 3 4 --env "$ENV" 
 	--n-samplers 4 \
 	--buffer-capacity 1000000 \
 	--update-sample-ratio 2.0 \
-	--soft-q-lr 1E-3 --policy-lr 1E-4 --alpha-lr 1E-3 \
-	--initial-alpha 1.0 --auto-entropy \
+	--soft-q-lr 1E-3 --policy-lr 1E-4 \
+	--alpha-lr 1E-3 --initial-alpha 1.0 --adaptive-entropy \
+	--gamma 0.99 --soft-tau 0.01 \
+	--normalize-rewards --reward-scale 1.0 \
 	--weight-decay 1E-5 --random-seed 0 \
 	--log-dir "logs/$ENV/RNN" \
 	--checkpoint-dir "checkpoints/$ENV/RNN"

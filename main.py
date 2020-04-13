@@ -41,14 +41,14 @@ parser.add_argument('--activation', type=str, choices=['ReLU', 'LeakyReLU'], def
                     help='activation function in networks (default: ReLU)')
 parser.add_argument('--deterministic', action='store_true', help='deterministic in evaluation')
 fc_group = parser.add_argument_group('FC controller')
-fc_group.add_argument('--hidden-dims', type=int, default=[512], nargs='+',
+fc_group.add_argument('--hidden-dims', type=int, default=[], nargs='+',
                       help='hidden dimensions of FC controller')
 rnn_group = parser.add_argument_group('RNN controller')
-rnn_group.add_argument('--hidden-dims-before-lstm', type=int, default=[512], nargs='+',
+rnn_group.add_argument('--hidden-dims-before-lstm', type=int, default=[], nargs='+',
                        help='hidden FC dimensions before LSTM layers in RNN controller')
-rnn_group.add_argument('--hidden-dims-lstm', type=int, default=[512], nargs='+',
+rnn_group.add_argument('--hidden-dims-lstm', type=int, default=[], nargs='+',
                        help='LSTM hidden dimensions of RNN controller')
-rnn_group.add_argument('--hidden-dims-after-lstm', type=int, default=[512], nargs='+',
+rnn_group.add_argument('--hidden-dims-after-lstm', type=int, default=[], nargs='+',
                        help='hidden FC dimensions after LSTM layers in RNN controller')
 rnn_group.add_argument('--skip-connection', action='store_true', default=False,
                        help='add skip connection beside LSTM layers in RNN controller')
@@ -77,6 +77,14 @@ parser.add_argument('--buffer-capacity', type=int, default=1000000,
                     help='capacity of replay buffer (default: 1000000)')
 parser.add_argument('--update-sample-ratio', type=float, default=2.0,
                     help='speed ratio of training and sampling (default: 2.0)')
+parser.add_argument('--gamma', type=float, default=0.99,
+                    help='discount factor for rewards (default: 0.99)')
+parser.add_argument('--soft-tau', type=float, default=0.01,
+                    help='soft update factor for target networks (default: 0.01)')
+parser.add_argument('--normalize-rewards', action='store_true',
+                    help='normalize rewards for training')
+parser.add_argument('--reward-scale', type=float, default=1.0,
+                    help='reward scale factor for normalized rewards (default: 1.0)')
 lr_group = parser.add_argument_group('learning rate')
 lr_group.add_argument('--lr', type=float, default=1E-4,
                       help='learning rate (can be override by the following specific learning rate) (default: 0.0001)')
@@ -89,7 +97,7 @@ alpha_group.add_argument('--alpha-lr', type=float, default=None,
                          help='learning rate for temperature parameter (use LR above if not present)')
 alpha_group.add_argument('--initial-alpha', type=float, default=1.0,
                          help='initial value of temperature parameter (default: 1.0)')
-alpha_group.add_argument('--auto-entropy', action='store_true',
+alpha_group.add_argument('--adaptive-entropy', action='store_true',
                          help='auto update temperature parameter while training')
 parser.add_argument('--weight-decay', type=float, default=0.0,
                     help='weight decay (default: 0.0)')
@@ -129,6 +137,7 @@ ENV_NAME = args.env
 ENV = gym.make(ENV_NAME)
 ENV.seed(RANDOM_SEED)
 ENV = FlattenedObservation(NormalizedAction(FlattenedAction(ENV)))
+ACTION_DIM = ENV.action_space.shape[0]
 if args.n_frames > 1:
     ENV = ConcatenatedObservation(ENV, n_frames=args.n_frames, dim=0)
 ENV_OBSERVATION_DIM = ENV.observation_space.shape[0]
@@ -153,6 +162,10 @@ BUFFER_CAPACITY = args.buffer_capacity
 N_UPDATES = args.n_updates
 BATCH_SIZE = args.batch_size
 UPDATE_SAMPLE_RATIO = args.update_sample_ratio
+GAMMA = args.gamma
+SOFT_TAU = args.soft_tau
+NORMALIZE_REWARDS = args.normalize_rewards
+REWARD_SCALE = args.reward_scale
 
 N_SAMPLES_PER_UPDATE = BATCH_SIZE
 if USE_LSTM:
@@ -167,7 +180,7 @@ ALPHA_LR = (args.alpha_lr or LR)
 
 INITIAL_ALPHA = args.initial_alpha
 WEIGHT_DECAY = args.weight_decay
-AUTO_ENTROPY = args.auto_entropy
+ADAPTIVE_ENTROPY = args.adaptive_entropy
 
 if args.gpu is not None and torch.cuda.is_available():
     if len(args.gpu) == 0:
@@ -239,7 +252,7 @@ def main():
     model = Model(env=ENV,
                   state_encoder=STATE_ENCODER,
                   state_dim=STATE_DIM,
-                  action_dim=ENV.action_space.shape[0],
+                  action_dim=ACTION_DIM,
                   activation=ACTIVATION,
                   initial_alpha=INITIAL_ALPHA,
                   n_samplers=N_SAMPLERS,
@@ -284,10 +297,12 @@ def main():
                 with tqdm.trange(N_UPDATES, desc=f'Training {epoch}/{N_EPOCHS}') as pbar:
                     for i in pbar:
                         soft_q_loss, policy_loss, alpha = model.update(batch_size=BATCH_SIZE,
-                                                                       normalize_rewards=True,
-                                                                       auto_entropy=AUTO_ENTROPY,
+                                                                       normalize_rewards=NORMALIZE_REWARDS,
+                                                                       reward_scale=REWARD_SCALE,
+                                                                       adaptive_entropy=ADAPTIVE_ENTROPY,
                                                                        target_entropy=-1.0 * model.action_dim,
-                                                                       soft_tau=0.01,
+                                                                       gamma=GAMMA,
+                                                                       soft_tau=SOFT_TAU,
                                                                        **update_kwargs)
                         global_step += 1
                         buffer_size = model.replay_buffer.size
