@@ -1,134 +1,18 @@
 import copy
 import itertools
-import os
 
 import numpy as np
 import torch
-import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
 
-from common.buffer import TrajectoryReplayBuffer
+from common.collector import TrajectoryCollector
 from common.utils import sync_params
-from sac.model import Collector, ModelBase as OriginalModelBase
-from sac.rnn.network import SoftQNetwork, PolicyNetwork, cat_hidden, StateEncoderWrapper
+from sac.model import ModelBase as OriginalModelBase
+from sac.rnn.network import SoftQNetwork, PolicyNetwork, StateEncoderWrapper
 
 
-__all__ = ['Collector', 'ModelBase', 'Trainer', 'Tester']
-
-
-class Sampler(mp.Process):
-    def __init__(self, rank, n_samplers, lock,
-                 running_event, event, next_sampler_event,
-                 env, state_encoder, policy_net,
-                 replay_buffer, episode_steps, episode_rewards,
-                 n_episodes, max_episode_steps,
-                 deterministic, random_sample, render,
-                 device, random_seed, log_dir):
-        super().__init__(name=f'sampler_{rank}')
-
-        self.rank = rank
-        self.n_samplers = n_samplers
-        self.lock = lock
-        self.running_event = running_event
-        self.event = event
-        self.next_sampler_event = next_sampler_event
-
-        self.env = copy.deepcopy(env)
-        self.env.seed(random_seed)
-
-        self.shared_state_encoder = state_encoder
-        self.shared_policy_net = policy_net
-        self.device = device
-
-        self.replay_buffer = replay_buffer
-        self.episode_steps = episode_steps
-        self.episode_rewards = episode_rewards
-
-        if np.isinf(n_episodes):
-            self.n_episodes = np.inf
-        else:
-            self.n_episodes = n_episodes // n_samplers
-            if rank < n_episodes % n_samplers:
-                self.n_episodes += 1
-        self.max_episode_steps = max_episode_steps
-        self.deterministic = deterministic
-        self.random_sample = random_sample
-        self.render = (render and rank == 0)
-
-        self.log_dir = log_dir
-
-    def run(self):
-        if not self.random_sample and self.log_dir is not None:
-            writer = SummaryWriter(log_dir=os.path.join(self.log_dir, f'sampler_{self.rank}'), comment=f'sampler_{self.rank}')
-        else:
-            writer = None
-
-        state_encoder = copy.deepcopy(self.shared_state_encoder)
-        policy_net = copy.deepcopy(self.shared_policy_net)
-        state_encoder.device = self.device
-        policy_net.device = self.device
-        state_encoder.to(self.device)
-        policy_net.to(self.device)
-
-        episode = 0
-        while episode < self.n_episodes:
-            sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-            sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
-            state_encoder.eval()
-            policy_net.eval()
-
-            episode_reward = 0
-            episode_steps = 0
-            trajectory = []
-            hiddens = []
-            hidden = policy_net.initial_hiddens(batch_size=1)
-            observation = self.env.reset()
-            if self.render:
-                try:
-                    self.env.render()
-                except Exception:
-                    pass
-            for step in range(self.max_episode_steps):
-                hiddens.append(hidden)
-
-                if self.random_sample:
-                    action = self.env.action_space.sample()
-                else:
-                    state = state_encoder.encode(observation)
-                    action, hidden = policy_net.get_action(state, hidden, deterministic=self.deterministic)
-                next_observation, reward, done, _ = self.env.step(action)
-                if self.render:
-                    try:
-                        self.env.render()
-                    except Exception:
-                        pass
-
-                episode_reward += reward
-                episode_steps += 1
-                trajectory.append((observation, action, [reward], next_observation, [done]))
-                observation = next_observation
-            hiddens = cat_hidden(hiddens, dim=0).detach().cpu()
-
-            self.running_event.wait()
-            self.event.wait()
-            with self.lock:
-                self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))), hiddens)
-                self.episode_steps.append(episode_steps)
-                self.episode_rewards.append(episode_reward)
-            self.event.clear()
-            self.next_sampler_event.set()
-            episode += 1
-            if writer is not None:
-                average_reward = episode_reward / episode_steps
-                writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
-                writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
-                writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
-                writer.flush()
-
-        if writer is not None:
-            writer.close()
+__all__ = ['ModelBase', 'Trainer', 'Tester']
 
 
 class ModelBase(OriginalModelBase):
@@ -168,15 +52,13 @@ class ModelBase(OriginalModelBase):
         ])
         self.modules.share_memory()
 
-        self.collector = Collector(state_encoder=self.state_encoder,
-                                   policy_net=self.policy_net,
-                                   sampler=Sampler,
-                                   replay_buffer=TrajectoryReplayBuffer,
-                                   env=env,
-                                   buffer_capacity=buffer_capacity,
-                                   n_samplers=n_samplers,
-                                   devices=self.devices,
-                                   random_seed=random_seed)
+        self.collector = TrajectoryCollector(state_encoder=self.state_encoder,
+                                             policy_net=self.policy_net,
+                                             env=env,
+                                             buffer_capacity=buffer_capacity,
+                                             n_samplers=n_samplers,
+                                             devices=self.devices,
+                                             random_seed=random_seed)
 
 
 class Trainer(ModelBase):
