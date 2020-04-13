@@ -11,12 +11,12 @@ cd "$ROOT_DIR"
 
 python3 main.py --mode test --gpu 0 --env "$ENV" \
 	--net RNN --activation LeakyReLU \
-	--hidden-dims-before-lstm 256 \
+	--hidden-dims-before-lstm 128 \
 	--hidden-dims-lstm 128 \
-	--hidden-dims-after-lstm 128 \
+	--hidden-dims-after-lstm 64 \
 	--skip-connection \
-	--state-dim 256 \
-	--encoder-hidden-dims 256 256 128 128 \
+	--state-dim 128 \
+	--encoder-hidden-dims 128 128 128 128 \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \

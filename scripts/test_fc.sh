@@ -11,9 +11,9 @@ cd "$ROOT_DIR"
 
 python3 main.py --mode test --gpu 0 --env "$ENV" \
 	--net FC --activation LeakyReLU \
-	--hidden-dims 256 256 128 128 \
-	--state-dim 256 \
-	--encoder-hidden-dims 256 128 \
+	--hidden-dims 128 128 64 64 \
+	--state-dim 128 \
+	--encoder-hidden-dims 128 128 \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \
