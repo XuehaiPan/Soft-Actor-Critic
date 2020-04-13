@@ -1,4 +1,3 @@
-import copy
 import itertools
 
 import numpy as np
@@ -7,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from common.collector import Collector
-from common.utils import sync_params
+from common.utils import clone_network, sync_params
 from sac.network import SoftQNetwork, PolicyNetwork, StateEncoderWrapper
 
 
@@ -83,6 +82,14 @@ class ModelBase(object):
                                                render, log_dir)
         return samplers
 
+    def train(self, mode=True):
+        self.training = mode
+        self.modules.train(mode=mode)
+        return self
+
+    def eval(self):
+        return self.train(mode=False)
+
     def save_model(self, path):
         torch.save(self.modules.state_dict(), path)
 
@@ -97,10 +104,8 @@ class Trainer(ModelBase):
         super().__init__(env, state_encoder, state_dim, action_dim, hidden_dims, activation,
                          initial_alpha, n_samplers, buffer_capacity, devices, random_seed)
 
-        self.training = True
-
-        self.target_soft_q_net_1 = copy.deepcopy(self.soft_q_net_1)
-        self.target_soft_q_net_2 = copy.deepcopy(self.soft_q_net_2)
+        self.target_soft_q_net_1 = clone_network(src_net=self.soft_q_net_1, device=self.model_device)
+        self.target_soft_q_net_2 = clone_network(src_net=self.soft_q_net_2, device=self.model_device)
         self.target_soft_q_net_1.eval()
         self.target_soft_q_net_2.eval()
 
@@ -114,6 +119,8 @@ class Trainer(ModelBase):
                                     lr=soft_q_lr, weight_decay=weight_decay)
         self.policy_loss_weight = policy_lr / soft_q_lr
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
+
+        self.train(mode=True)
 
     def update(self, batch_size, normalize_rewards=True, reward_scale=1.0,
                adaptive_entropy=True, target_entropy=-2.0,
@@ -176,14 +183,6 @@ class Trainer(ModelBase):
         }
         return soft_q_loss.item(), policy_loss.item(), alpha.item(), info
 
-    def train(self, mode=True):
-        self.training = mode
-        self.modules.train(mode=mode)
-        return self
-
-    def eval(self):
-        return self.train(mode=False)
-
     def load_model(self, path):
         super().load_model(path=path)
         self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
@@ -196,4 +195,4 @@ class Tester(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.modules.eval()
+        self.eval()

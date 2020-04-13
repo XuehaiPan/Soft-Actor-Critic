@@ -1,13 +1,14 @@
 import copy
 import itertools
 import os
+from functools import lru_cache
 
 import numpy as np
 import torch.multiprocessing as mp
 from torch.utils.tensorboard import SummaryWriter
 
 from common.buffer import ReplayBuffer, TrajectoryReplayBuffer
-from common.utils import sync_params
+from common.utils import clone_network, sync_params
 from sac.rnn.network import cat_hidden
 
 
@@ -50,39 +51,26 @@ class Sampler(mp.Process):
         self.max_episode_steps = max_episode_steps
         self.deterministic = deterministic
         self.random_sample = random_sample
-        self.render = (render and rank == 0)
+        self.render_env = (render and rank == 0)
 
         self.log_dir = log_dir
 
     def run(self):
-        if not self.random_sample and self.log_dir is not None:
-            writer = SummaryWriter(log_dir=os.path.join(self.log_dir, f'sampler_{self.rank}'), comment=f'sampler_{self.rank}')
-        else:
-            writer = None
-
-        state_encoder = copy.deepcopy(self.shared_state_encoder)
-        policy_net = copy.deepcopy(self.shared_policy_net)
-        state_encoder.device = self.device
-        policy_net.device = self.device
-        state_encoder.to(self.device)
-        policy_net.to(self.device)
+        state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+        policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+        state_encoder.eval()
+        policy_net.eval()
 
         episode = 0
         while episode < self.n_episodes:
             sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
             sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
-            state_encoder.eval()
-            policy_net.eval()
 
             episode_reward = 0
             episode_steps = 0
             trajectory = []
             observation = self.env.reset()
-            if self.render:
-                try:
-                    self.env.render()
-                except Exception:
-                    pass
+            self.render()
             for step in range(self.max_episode_steps):
                 if self.random_sample:
                     action = self.env.action_space.sample()
@@ -90,11 +78,7 @@ class Sampler(mp.Process):
                     state = state_encoder.encode(observation)
                     action = policy_net.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
-                if self.render:
-                    try:
-                        self.env.render()
-                    except Exception:
-                        pass
+                self.render()
 
                 episode_reward += reward
                 episode_steps += 1
@@ -110,37 +94,43 @@ class Sampler(mp.Process):
             self.event.clear()
             self.next_sampler_event.set()
             episode += 1
-            if writer is not None:
+            if self.writer is not None:
                 average_reward = episode_reward / episode_steps
-                writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
-                writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
-                writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
-                writer.flush()
+                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
+                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
+                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
+                self.writer.flush()
 
-        if writer is not None:
-            writer.close()
+        if self.writer is not None:
+            self.writer.close()
+
+    def render(self):
+        if self.render_env:
+            try:
+                self.env.render()
+            except Exception:
+                pass
+
+    @property
+    @lru_cache(maxsize=None)
+    def writer(self):
+        if not self.random_sample and self.log_dir is not None:
+            return SummaryWriter(log_dir=os.path.join(self.log_dir, f'sampler_{self.rank}'), comment=f'sampler_{self.rank}')
+        else:
+            return None
 
 
 class TrajectorySampler(Sampler):
     def run(self):
-        if not self.random_sample and self.log_dir is not None:
-            writer = SummaryWriter(log_dir=os.path.join(self.log_dir, f'sampler_{self.rank}'), comment=f'sampler_{self.rank}')
-        else:
-            writer = None
-
-        state_encoder = copy.deepcopy(self.shared_state_encoder)
-        policy_net = copy.deepcopy(self.shared_policy_net)
-        state_encoder.device = self.device
-        policy_net.device = self.device
-        state_encoder.to(self.device)
-        policy_net.to(self.device)
+        state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+        policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+        state_encoder.eval()
+        policy_net.eval()
 
         episode = 0
         while episode < self.n_episodes:
             sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
             sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
-            state_encoder.eval()
-            policy_net.eval()
 
             episode_reward = 0
             episode_steps = 0
@@ -148,11 +138,7 @@ class TrajectorySampler(Sampler):
             hiddens = []
             hidden = policy_net.initial_hiddens(batch_size=1)
             observation = self.env.reset()
-            if self.render:
-                try:
-                    self.env.render()
-                except Exception:
-                    pass
+            self.render()
             for step in range(self.max_episode_steps):
                 hiddens.append(hidden)
 
@@ -162,11 +148,7 @@ class TrajectorySampler(Sampler):
                     state = state_encoder.encode(observation)
                     action, hidden = policy_net.get_action(state, hidden, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
-                if self.render:
-                    try:
-                        self.env.render()
-                    except Exception:
-                        pass
+                self.render()
 
                 episode_reward += reward
                 episode_steps += 1
@@ -183,15 +165,15 @@ class TrajectorySampler(Sampler):
             self.event.clear()
             self.next_sampler_event.set()
             episode += 1
-            if writer is not None:
+            if self.writer is not None:
                 average_reward = episode_reward / episode_steps
-                writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
-                writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
-                writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
-                writer.flush()
+                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
+                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
+                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
+                self.writer.flush()
 
-        if writer is not None:
-            writer.close()
+        if self.writer is not None:
+            self.writer.close()
 
 
 class CollectorBase(object):
