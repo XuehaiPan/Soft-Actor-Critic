@@ -18,7 +18,9 @@ __all__ = ['Collector', 'ModelBase', 'Trainer', 'Tester']
 
 
 class Sampler(mp.Process):
-    def __init__(self, rank, n_samplers, lock, event, env, state_encoder, policy_net,
+    def __init__(self, rank, n_samplers, lock,
+                 running_event, event, next_sampler_event,
+                 env, state_encoder, policy_net,
                  replay_buffer, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
                  deterministic, random_sample, render,
@@ -28,7 +30,9 @@ class Sampler(mp.Process):
         self.rank = rank
         self.n_samplers = n_samplers
         self.lock = lock
+        self.running_event = running_event
         self.event = event
+        self.next_sampler_event = next_sampler_event
 
         self.env = copy.deepcopy(env)
         self.env.seed(random_seed)
@@ -50,7 +54,7 @@ class Sampler(mp.Process):
         self.max_episode_steps = max_episode_steps
         self.deterministic = deterministic
         self.random_sample = random_sample
-        self.render = render
+        self.render = (render and rank == 0)
 
         self.log_dir = log_dir
 
@@ -101,11 +105,14 @@ class Sampler(mp.Process):
                 trajectory.append((observation, action, [reward], next_observation, [done]))
                 observation = next_observation
 
+            self.running_event.wait()
             self.event.wait()
             with self.lock:
                 self.replay_buffer.extend(trajectory)
                 self.episode_steps.append(episode_steps)
                 self.episode_rewards.append(episode_reward)
+            self.event.clear()
+            self.next_sampler_event.set()
             episode += 1
             if writer is not None:
                 average_reward = episode_reward / episode_steps
@@ -119,7 +126,8 @@ class Sampler(mp.Process):
 
 
 class Collector(object):
-    def __init__(self, state_encoder, policy_net, sampler, replay_buffer, env, buffer_capacity, n_samplers, devices, random_seed):
+    def __init__(self, state_encoder, policy_net, sampler, replay_buffer,
+                 env, buffer_capacity, n_samplers, devices, random_seed):
         self.manager = mp.Manager()
         self.running_event = self.manager.Event()
         self.running_event.set()
@@ -150,9 +158,15 @@ class Collector(object):
                      render=False, log_dir=None):
         self.resume()
 
+        events = [self.manager.Event() for i in range(self.n_samplers)]
+        for event in events:
+            event.clear()
+        events[0].set()
+
         samplers = []
         for rank in range(self.n_samplers):
-            sampler = self.sampler(rank, self.n_samplers, self.lock, self.running_event,
+            sampler = self.sampler(rank, self.n_samplers, self.lock,
+                                   self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
                                    self.env, self.state_encoder, self.policy_net,
                                    self.replay_buffer, self.episode_steps, self.episode_rewards,
                                    n_episodes, max_episode_steps,

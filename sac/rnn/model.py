@@ -19,7 +19,9 @@ __all__ = ['Collector', 'ModelBase', 'Trainer', 'Tester']
 
 
 class Sampler(mp.Process):
-    def __init__(self, rank, n_samplers, lock, event, env, state_encoder, policy_net,
+    def __init__(self, rank, n_samplers, lock,
+                 running_event, event, next_sampler_event,
+                 env, state_encoder, policy_net,
                  replay_buffer, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
                  deterministic, random_sample, render,
@@ -29,7 +31,9 @@ class Sampler(mp.Process):
         self.rank = rank
         self.n_samplers = n_samplers
         self.lock = lock
+        self.running_event = running_event
         self.event = event
+        self.next_sampler_event = next_sampler_event
 
         self.env = copy.deepcopy(env)
         self.env.seed(random_seed)
@@ -51,7 +55,7 @@ class Sampler(mp.Process):
         self.max_episode_steps = max_episode_steps
         self.deterministic = deterministic
         self.random_sample = random_sample
-        self.render = render
+        self.render = (render and rank == 0)
 
         self.log_dir = log_dir
 
@@ -106,11 +110,15 @@ class Sampler(mp.Process):
                 trajectory.append((observation, action, [reward], next_observation, [done]))
                 observation = next_observation
             hiddens = cat_hidden(hiddens, dim=0).detach().cpu()
+
+            self.running_event.wait()
             self.event.wait()
             with self.lock:
                 self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))), hiddens)
                 self.episode_steps.append(episode_steps)
                 self.episode_rewards.append(episode_reward)
+            self.event.clear()
+            self.next_sampler_event.set()
             episode += 1
             if writer is not None:
                 average_reward = episode_reward / episode_steps
