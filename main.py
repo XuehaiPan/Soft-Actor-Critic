@@ -296,14 +296,14 @@ def main():
                 ratio_list = []
                 with tqdm.trange(N_UPDATES, desc=f'Training {epoch}/{N_EPOCHS}') as pbar:
                     for i in pbar:
-                        soft_q_loss, policy_loss, alpha = model.update(batch_size=BATCH_SIZE,
-                                                                       normalize_rewards=NORMALIZE_REWARDS,
-                                                                       reward_scale=REWARD_SCALE,
-                                                                       adaptive_entropy=ADAPTIVE_ENTROPY,
-                                                                       target_entropy=-1.0 * model.action_dim,
-                                                                       gamma=GAMMA,
-                                                                       soft_tau=SOFT_TAU,
-                                                                       **update_kwargs)
+                        soft_q_loss, policy_loss, alpha, info = model.update(batch_size=BATCH_SIZE,
+                                                                             normalize_rewards=NORMALIZE_REWARDS,
+                                                                             reward_scale=REWARD_SCALE,
+                                                                             adaptive_entropy=ADAPTIVE_ENTROPY,
+                                                                             target_entropy=-1.0 * model.action_dim,
+                                                                             gamma=GAMMA,
+                                                                             soft_tau=SOFT_TAU,
+                                                                             **update_kwargs)
                         global_step += 1
                         buffer_size = model.replay_buffer.size
                         try:
@@ -317,11 +317,13 @@ def main():
                         train_writer.add_scalar(tag='train/soft_q_loss', scalar_value=soft_q_loss, global_step=global_step)
                         train_writer.add_scalar(tag='train/policy_loss', scalar_value=policy_loss, global_step=global_step)
                         train_writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha, global_step=global_step)
+                        train_writer.add_scalar(tag='train/action_scale', scalar_value=info['action_scale'], global_step=global_step)
                         train_writer.add_scalar(tag='train/buffer_size', scalar_value=buffer_size, global_step=global_step)
                         train_writer.add_scalar(tag='train/update_sample_ratio', scalar_value=update_sample_ratio, global_step=global_step)
                         pbar.set_postfix(OrderedDict([('global_step', global_step),
                                                       ('soft_q_loss', np.mean(soft_q_loss_list)),
                                                       ('policy_loss', np.mean(policy_loss_list)),
+                                                      *info.items(),
                                                       ('n_samples', model.collector.total_steps),
                                                       ('update_sample_ratio', update_sample_ratio)]))
                         if update_sample_ratio < UPDATE_SAMPLE_RATIO:

@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 
@@ -48,8 +49,18 @@ class SoftQNetwork(VanillaRecurrentNeuralNetwork):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
+        self.action_scaler = nn.Linear(in_features=action_dim, out_features=action_dim, bias=True)
+        nn.init.eye_(self.action_scaler.weight)
+        nn.init.zeros_(self.action_scaler.bias)
+
     def forward(self, state, action, hidden=None):
-        return super().forward(torch.cat([state, action], dim=-1), hidden)
+        return super().forward(torch.cat([state, self.action_scaler(action)], dim=-1), hidden)
+
+    @property
+    def action_scale(self):
+        with torch.no_grad():
+            eigenvalues = self.action_scaler.weight.eig(eigenvectors=False).eigenvalues
+        return eigenvalues.abs().max().item()
 
 
 class PolicyNetwork(VanillaRecurrentNeuralNetwork):

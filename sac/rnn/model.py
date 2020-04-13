@@ -266,7 +266,10 @@ class Trainer(ModelBase):
         sync_params(src_net=self.soft_q_net_1, dst_net=self.target_soft_q_net_1, soft_tau=soft_tau)
         sync_params(src_net=self.soft_q_net_2, dst_net=self.target_soft_q_net_2, soft_tau=soft_tau)
 
-        return soft_q_loss.item(), policy_loss.item(), alpha.item()
+        info = {
+            'action_scale': (self.soft_q_net_1.action_scale + self.soft_q_net_2.action_scale) / 2.0
+        }
+        return soft_q_loss.item(), policy_loss.item(), alpha.item(), info
 
     def train(self, mode=True):
         self.training = mode
