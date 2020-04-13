@@ -85,6 +85,7 @@ class ModelBase(object):
     def train(self, mode=True):
         self.training = mode
         self.modules.train(mode=mode)
+        self.collector.train(mode=mode)
         return self
 
     def eval(self):

@@ -1,10 +1,12 @@
 import copy
 import itertools
 import os
+import time
 from functools import lru_cache
 
 import numpy as np
 import torch.multiprocessing as mp
+import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from common.buffer import ReplayBuffer, TrajectoryReplayBuffer
@@ -18,7 +20,7 @@ __all__ = ['Collector', 'TrajectoryCollector']
 class Sampler(mp.Process):
     def __init__(self, rank, n_samplers, lock,
                  running_event, event, next_sampler_event,
-                 env, state_encoder, policy_net,
+                 env, state_encoder, policy_net, eval_only,
                  replay_buffer, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
                  deterministic, random_sample, render,
@@ -37,6 +39,7 @@ class Sampler(mp.Process):
         self.shared_state_encoder = state_encoder
         self.shared_policy_net = policy_net
         self.device = device
+        self.eval_only = eval_only
 
         self.replay_buffer = replay_buffer
         self.episode_steps = episode_steps
@@ -63,8 +66,9 @@ class Sampler(mp.Process):
 
         episode = 0
         while episode < self.n_episodes:
-            sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-            sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
+            if not self.eval_only:
+                sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
+                sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
 
             episode_reward = 0
             episode_steps = 0
@@ -129,8 +133,9 @@ class TrajectorySampler(Sampler):
 
         episode = 0
         while episode < self.n_episodes:
-            sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-            sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
+            if not self.eval_only:
+                sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
+                sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
 
             episode_reward = 0
             episode_steps = 0
@@ -188,10 +193,11 @@ class CollectorBase(object):
 
         self.state_encoder = state_encoder
         self.policy_net = policy_net
-        self.replay_buffer = replay_buffer(capacity=buffer_capacity, initializer=self.manager.list, lock=self.manager.Lock())
+        self.eval_only = False
 
         self.n_samplers = n_samplers
         self.sampler = sampler
+        self.replay_buffer = replay_buffer(capacity=buffer_capacity, initializer=self.manager.list, lock=self.manager.Lock())
 
         self.env = env
         self.devices = [device for _, device in zip(range(n_samplers), itertools.cycle(devices))]
@@ -218,7 +224,7 @@ class CollectorBase(object):
         for rank in range(self.n_samplers):
             sampler = self.sampler(rank, self.n_samplers, self.lock,
                                    self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
-                                   self.env, self.state_encoder, self.policy_net,
+                                   self.env, self.state_encoder, self.policy_net, self.eval_only,
                                    self.replay_buffer, self.episode_steps, self.episode_rewards,
                                    n_episodes, max_episode_steps,
                                    deterministic, random_sample, render,
@@ -230,8 +236,21 @@ class CollectorBase(object):
 
     def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
                render=False, log_dir=None):
+        n_initial_episodes = self.n_episodes
+
         samplers = self.async_sample(n_episodes, max_episode_steps, deterministic, random_sample,
                                      render, log_dir)
+
+        pbar = tqdm.tqdm(total=n_episodes, desc='Sampling')
+        while True:
+            n_new_episodes = self.n_episodes - n_initial_episodes
+            if n_new_episodes > pbar.n:
+                pbar.n = n_new_episodes
+                pbar.set_postfix({'buffer_size': self.replay_buffer.size})
+                if pbar.n >= n_episodes:
+                    break
+            else:
+                time.sleep(0.1)
 
         for sampler in samplers:
             sampler.join()
@@ -241,6 +260,13 @@ class CollectorBase(object):
 
     def resume(self):
         self.running_event.set()
+
+    def train(self, mode=True):
+        self.eval_only = (not mode)
+        return self
+
+    def eval(self):
+        return self.train(mode=False)
 
 
 class Collector(CollectorBase):

@@ -266,8 +266,9 @@ def main():
     if INITIAL_CHECKPOINT is not None:
         model.load_model(path=INITIAL_CHECKPOINT)
 
+    print(f'Start parallel sampling using {N_SAMPLERS} samplers at {tuple(map(str, model.collector.devices))}.')
     if MODE == 'train' and INITIAL_EPOCH < N_EPOCHS:
-        print(f'Sampling...')
+        model.collector.eval()
         while model.replay_buffer.size < 10 * n_samples_per_update:
             model.sample(n_episodes=10,
                          max_episode_steps=MAX_EPISODE_STEPS,
@@ -275,7 +276,7 @@ def main():
                          random_sample=initial_random_sample,
                          render=RENDER)
 
-        print(f'Start parallel sampling using {N_SAMPLERS} samplers at {tuple(map(str, model.collector.devices))}.')
+        model.collector.train()
         samplers = model.async_sample(n_episodes=np.inf,
                                       max_episode_steps=MAX_EPISODE_STEPS,
                                       deterministic=False,
@@ -359,8 +360,7 @@ def main():
                      deterministic=DETERMINISTIC,
                      random_sample=False,
                      render=RENDER,
-                     log_dir=LOG_DIR,
-                     progress=True)
+                     log_dir=LOG_DIR)
         episode_steps = np.asanyarray(model.collector.episode_steps)
         episode_rewards = np.asanyarray(model.collector.episode_rewards)
         average_reward = episode_rewards / episode_steps
