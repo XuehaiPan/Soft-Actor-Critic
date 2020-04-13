@@ -3,6 +3,7 @@ import glob
 import os
 import random
 import re
+import time
 from collections import OrderedDict
 
 import gym
@@ -288,13 +289,12 @@ def main():
             train_writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, 'trainer'), comment='trainer')
             n_initial_samples = model.collector.total_steps
             while model.collector.total_steps == n_initial_samples:
-                pass
+                time.sleep(0.1)
             global_step = 0
             for epoch in range(INITIAL_EPOCH + 1, N_EPOCHS + 1):
-                soft_q_loss_list = []
-                policy_loss_list = []
-                alpha_list = []
-                ratio_list = []
+                epoch_soft_q_loss = 0.0
+                epoch_policy_loss = 0.0
+                epoch_alpha = 0.0
                 with tqdm.trange(N_UPDATES, desc=f'Training {epoch}/{N_EPOCHS}') as pbar:
                     for i in pbar:
                         soft_q_loss, policy_loss, alpha, info = model.update(batch_size=BATCH_SIZE,
@@ -311,10 +311,9 @@ def main():
                             update_sample_ratio = (n_samples_per_update * global_step) / (model.collector.total_steps - n_initial_samples)
                         except ZeroDivisionError:
                             update_sample_ratio = UPDATE_SAMPLE_RATIO
-                        soft_q_loss_list.append(soft_q_loss)
-                        policy_loss_list.append(policy_loss)
-                        alpha_list.append(alpha)
-                        ratio_list.append(update_sample_ratio)
+                        epoch_soft_q_loss += (soft_q_loss - epoch_soft_q_loss) / (i + 1)
+                        epoch_policy_loss += (policy_loss - epoch_policy_loss) / (i + 1)
+                        epoch_alpha += (alpha - epoch_alpha) / (i + 1)
                         train_writer.add_scalar(tag='train/soft_q_loss', scalar_value=soft_q_loss, global_step=global_step)
                         train_writer.add_scalar(tag='train/policy_loss', scalar_value=policy_loss, global_step=global_step)
                         train_writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha, global_step=global_step)
@@ -322,8 +321,8 @@ def main():
                         train_writer.add_scalar(tag='train/buffer_size', scalar_value=buffer_size, global_step=global_step)
                         train_writer.add_scalar(tag='train/update_sample_ratio', scalar_value=update_sample_ratio, global_step=global_step)
                         pbar.set_postfix(OrderedDict([('global_step', global_step),
-                                                      ('soft_q_loss', np.mean(soft_q_loss_list)),
-                                                      ('policy_loss', np.mean(policy_loss_list)),
+                                                      ('soft_q_loss', epoch_soft_q_loss),
+                                                      ('policy_loss', epoch_policy_loss),
                                                       *info.items(),
                                                       ('n_samples', model.collector.total_steps),
                                                       ('update_sample_ratio', update_sample_ratio)]))
@@ -332,10 +331,9 @@ def main():
                         else:
                             model.collector.resume()
 
-                train_writer.add_scalar(tag='epoch/soft_q_loss', scalar_value=np.mean(soft_q_loss_list), global_step=epoch)
-                train_writer.add_scalar(tag='epoch/policy_loss', scalar_value=np.mean(policy_loss_list), global_step=epoch)
-                train_writer.add_scalar(tag='epoch/temperature_parameter', scalar_value=np.mean(alpha_list), global_step=epoch)
-                train_writer.add_scalar(tag='epoch/update_sample_ratio', scalar_value=np.mean(ratio_list), global_step=epoch)
+                train_writer.add_scalar(tag='epoch/soft_q_loss', scalar_value=epoch_soft_q_loss, global_step=epoch)
+                train_writer.add_scalar(tag='epoch/policy_loss', scalar_value=epoch_policy_loss, global_step=epoch)
+                train_writer.add_scalar(tag='epoch/temperature_parameter', scalar_value=epoch_alpha, global_step=epoch)
 
                 train_writer.flush()
                 if epoch % 2 == 0:
