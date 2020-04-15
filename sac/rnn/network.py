@@ -1,17 +1,25 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 
 from common.network_base import VanillaRecurrentNeuralNetwork, LSTMHidden
-from sac.network import StateEncoderWrapper as OriginalStateEncoderWrapper
+from sac.network import StateEncoderWrapper as OriginalStateEncoderWrapper, ActionScaler
 
 
-__all__ = ['cat_hidden', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'StateEncoderWrapper']
+__all__ = ['cat_hidden', 'StateEncoderWrapper', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork']
 
 DEVICE_CPU = torch.device('cpu')
 
 cat_hidden = LSTMHidden.cat
+
+
+class StateEncoderWrapper(OriginalStateEncoderWrapper):
+    def encode(self, observation):
+        with torch.no_grad():
+            observation = torch.FloatTensor(observation).unsqueeze(dim=0).unsqueeze(dim=0).to(self.device)
+            encoded = self(observation)
+        encoded = encoded.cpu().numpy()[0, 0]
+        return encoded
 
 
 class ValueNetwork(VanillaRecurrentNeuralNetwork):
@@ -49,19 +57,14 @@ class SoftQNetwork(VanillaRecurrentNeuralNetwork):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
-        self.action_scaler = nn.Linear(in_features=action_dim, out_features=action_dim, bias=True)
-        nn.init.eye_(self.action_scaler.weight)
-        nn.init.zeros_(self.action_scaler.bias)
-        self.action_scaler.to(self.device)
+        self.action_scaler = ActionScaler(action_dim=action_dim, device=device)
 
     def forward(self, state, action, hidden=None):
         return super().forward(torch.cat([state, self.action_scaler(action)], dim=-1), hidden)
 
     @property
     def action_scale(self):
-        with torch.no_grad():
-            eigenvalues = self.action_scaler.weight.eig(eigenvectors=False).eigenvalues
-        return eigenvalues.abs().max().item()
+        return self.action_scaler.action_scale
 
 
 class PolicyNetwork(VanillaRecurrentNeuralNetwork):
@@ -112,12 +115,3 @@ class PolicyNetwork(VanillaRecurrentNeuralNetwork):
                 action = torch.tanh(mean + std * z)
         action = action.cpu().numpy()[0, 0]
         return action, hidden
-
-
-class StateEncoderWrapper(OriginalStateEncoderWrapper):
-    def encode(self, observation):
-        with torch.no_grad():
-            observation = torch.FloatTensor(observation).unsqueeze(dim=0).unsqueeze(dim=0).to(self.device)
-            encoded = self(observation)
-        encoded = encoded.cpu().numpy()[0, 0]
-        return encoded

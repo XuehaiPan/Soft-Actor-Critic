@@ -6,9 +6,52 @@ from torch.distributions import Normal
 from common.network_base import NetworkBase, VanillaNeuralNetwork
 
 
-__all__ = ['ValueNetwork', 'SoftQNetwork', 'PolicyNetwork', 'StateEncoderWrapper']
+__all__ = ['StateEncoderWrapper', 'ActionScaler', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork']
 
 DEVICE_CPU = torch.device('cpu')
+
+
+class StateEncoderWrapper(NetworkBase):
+    def __init__(self, encoder, device):
+        super().__init__()
+
+        self.encoder = encoder
+        self.device = device
+
+        self.to(device)
+
+    def forward(self, *input, **kwargs):
+        return self.encoder.forward(*input, **kwargs)
+
+    def encode(self, observation):
+        with torch.no_grad():
+            observation = torch.FloatTensor(observation).unsqueeze(dim=0).to(self.device)
+            encoded = self(observation)
+        encoded = encoded.cpu().numpy()[0]
+        return encoded
+
+
+class ActionScaler(NetworkBase):
+    def __init__(self, action_dim, device=DEVICE_CPU):
+        super().__init__()
+        self.device = device
+
+        self.action_dim = action_dim
+
+        self.scaler = nn.Linear(in_features=action_dim, out_features=action_dim, bias=True)
+        nn.init.eye_(self.scaler.weight)
+        nn.init.zeros_(self.scaler.bias)
+
+        self.to(device)
+
+    def forward(self, action):
+        return self.scaler.forward(action)
+
+    @property
+    def action_scale(self):
+        with torch.no_grad():
+            eigenvalues = self.scaler.weight.eig(eigenvectors=False).eigenvalues
+        return eigenvalues.abs().cpu().numpy()
 
 
 class ValueNetwork(VanillaNeuralNetwork):
@@ -34,19 +77,14 @@ class SoftQNetwork(VanillaNeuralNetwork):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
-        self.action_scaler = nn.Linear(in_features=action_dim, out_features=action_dim, bias=True)
-        nn.init.eye_(self.action_scaler.weight)
-        nn.init.zeros_(self.action_scaler.bias)
-        self.action_scaler.to(self.device)
+        self.action_scaler = ActionScaler(action_dim=action_dim, device=device)
 
     def forward(self, state, action):
         return super().forward(torch.cat([state, self.action_scaler(action)], dim=-1))
 
     @property
     def action_scale(self):
-        with torch.no_grad():
-            eigenvalues = self.action_scaler.weight.eig(eigenvectors=False).eigenvalues
-        return eigenvalues.abs().max().item()
+        return self.action_scaler.action_scale
 
 
 class PolicyNetwork(VanillaNeuralNetwork):
@@ -91,23 +129,3 @@ class PolicyNetwork(VanillaNeuralNetwork):
                 action = torch.tanh(mean + std * z)
         action = action.cpu().numpy()[0]
         return action
-
-
-class StateEncoderWrapper(NetworkBase):
-    def __init__(self, encoder, device):
-        super().__init__()
-
-        self.encoder = encoder
-        self.device = device
-
-        self.to(device)
-
-    def forward(self, *input, **kwargs):
-        return self.encoder.forward(*input, **kwargs)
-
-    def encode(self, observation):
-        with torch.no_grad():
-            observation = torch.FloatTensor(observation).unsqueeze(dim=0).to(self.device)
-            encoded = self(observation)
-        encoded = encoded.cpu().numpy()[0]
-        return encoded
