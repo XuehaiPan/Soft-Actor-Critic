@@ -89,6 +89,9 @@ class Sampler(mp.Process):
                 trajectory.append((observation, action, [reward], next_observation, [done]))
                 observation = next_observation
 
+                if done:
+                    break
+
             self.running_event.wait()
             self.event.wait()
             with self.lock:
@@ -159,6 +162,10 @@ class TrajectorySampler(Sampler):
                 episode_steps += 1
                 trajectory.append((observation, action, [reward], next_observation, [done]))
                 observation = next_observation
+
+                if done:
+                    break
+
             hiddens = cat_hidden(hiddens, dim=0).detach().cpu()
 
             self.running_event.wait()
