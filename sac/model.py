@@ -54,6 +54,10 @@ class ModelBase(object):
 
     def print_info(self):
         print(f'env = {self.env}')
+        observation_dim = self.env.observation_space.shape
+        if len(observation_dim) == 1:
+            observation_dim = observation_dim[0]
+        print(f'observation_dim = {observation_dim}')
         print(f'state_dim = {self.state_dim}')
         print(f'action_dim = {self.action_dim}')
         print(f'device = {self.model_device}')

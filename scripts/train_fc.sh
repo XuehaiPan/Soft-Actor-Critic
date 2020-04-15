@@ -16,7 +16,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--state-dim 128 \
 	--encoder-hidden-dims 128 128 \
 	--max-episode-steps 500 \
-	--n-epochs 4000 --n-updates 256 --batch-size 256 \
+	--n-epochs 1000 --n-updates 256 --batch-size 256 \
 	--n-samplers 4 \
 	--buffer-capacity 1000000 \
 	--update-sample-ratio 2.0 \

@@ -323,9 +323,8 @@ def main():
                         pbar.set_postfix(OrderedDict([('global_step', global_step),
                                                       ('soft_q_loss', epoch_soft_q_loss),
                                                       ('policy_loss', epoch_policy_loss),
-                                                      *info.items(),
-                                                      ('n_samples', model.collector.total_steps),
-                                                      ('update_sample_ratio', update_sample_ratio)]))
+                                                      ('n_samples', f'{model.collector.total_steps:.2E}'),
+                                                      ('update_sample_ratio', f'{update_sample_ratio:.1f}')]))
                         if update_sample_ratio < UPDATE_SAMPLE_RATIO:
                             model.collector.pause()
                         else:
@@ -336,7 +335,7 @@ def main():
                 train_writer.add_scalar(tag='epoch/temperature_parameter', scalar_value=epoch_alpha, global_step=epoch)
 
                 train_writer.flush()
-                if epoch % 2 == 0:
+                if epoch % 10 == 0:
                     model.save_model(path=os.path.join(CHECKPOINT_DIR, f'checkpoint-{epoch}.pkl'))
 
             train_writer.close()
