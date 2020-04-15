@@ -59,14 +59,17 @@ class Sampler(mp.Process):
         self.log_dir = log_dir
 
     def run(self):
-        state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-        policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
-        state_encoder.eval()
-        policy_net.eval()
+        if not self.random_sample:
+            state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+            policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+            state_encoder.eval()
+            policy_net.eval()
+        else:
+            state_encoder = policy_net = None
 
         episode = 0
         while episode < self.n_episodes:
-            if not self.eval_only:
+            if not (self.eval_only or self.random_sample):
                 sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
                 sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
 
@@ -129,14 +132,17 @@ class Sampler(mp.Process):
 
 class TrajectorySampler(Sampler):
     def run(self):
-        state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-        policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
-        state_encoder.eval()
-        policy_net.eval()
+        if not self.random_sample:
+            state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+            policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+            state_encoder.eval()
+            policy_net.eval()
+        else:
+            state_encoder = policy_net = None
 
         episode = 0
         while episode < self.n_episodes:
-            if not self.eval_only:
+            if not (self.eval_only or self.random_sample):
                 sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
                 sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
 
