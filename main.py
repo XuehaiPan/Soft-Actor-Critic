@@ -95,7 +95,7 @@ lr_group.add_argument('--policy-lr', type=float, default=None,
                       help='learning rate for Policy Networks (use LR above if not present)')
 alpha_group = parser.add_argument_group('temperature parameter')
 alpha_group.add_argument('--alpha-lr', type=float, default=None,
-                         help='learning rate for temperature parameter (use LR above if not present)')
+                         help='learning rate for temperature parameter (use POLICY_LR above if not present)')
 alpha_group.add_argument('--initial-alpha', type=float, default=1.0,
                          help='initial value of temperature parameter (default: 1.0)')
 alpha_group.add_argument('--adaptive-entropy', action='store_true',
@@ -177,7 +177,7 @@ DETERMINISTIC = args.deterministic
 LR = args.lr
 SOFT_Q_LR = (args.soft_q_lr or LR)
 POLICY_LR = (args.policy_lr or LR)
-ALPHA_LR = (args.alpha_lr or LR)
+ALPHA_LR = (args.alpha_lr or POLICY_LR)
 
 INITIAL_ALPHA = args.initial_alpha
 WEIGHT_DECAY = args.weight_decay
@@ -218,7 +218,6 @@ def main():
     model_kwargs = {}
     update_kwargs = {}
     initial_random_sample = True
-    n_samples_per_update = BATCH_SIZE
     if not USE_LSTM:
         model_kwargs.update({'hidden_dims': HIDDEN_DIMS})
     else:
@@ -242,7 +241,6 @@ def main():
         else:
             from sac.rnn.model import Trainer as Model
             initial_random_sample = False
-            n_samples_per_update *= STEP_SIZE
             update_kwargs.update({'step_size': STEP_SIZE})
     else:
         if not USE_LSTM:
@@ -270,7 +268,7 @@ def main():
     print(f'Start parallel sampling using {N_SAMPLERS} samplers at {tuple(map(str, model.collector.devices))}.')
     if MODE == 'train' and INITIAL_EPOCH < N_EPOCHS:
         model.collector.eval()
-        while model.replay_buffer.size < 10 * n_samples_per_update:
+        while model.replay_buffer.size < 10 * N_SAMPLES_PER_UPDATE:
             model.sample(n_episodes=10,
                          max_episode_steps=MAX_EPISODE_STEPS,
                          deterministic=False,
@@ -290,7 +288,7 @@ def main():
             n_initial_samples = model.collector.total_steps
             while model.collector.total_steps == n_initial_samples:
                 time.sleep(0.1)
-            global_step = 0
+
             for epoch in range(INITIAL_EPOCH + 1, N_EPOCHS + 1):
                 epoch_soft_q_loss = 0.0
                 epoch_policy_loss = 0.0
@@ -305,26 +303,31 @@ def main():
                                                                              gamma=GAMMA,
                                                                              soft_tau=SOFT_TAU,
                                                                              **update_kwargs)
-                        global_step += 1
+
                         buffer_size = model.replay_buffer.size
                         try:
-                            update_sample_ratio = (n_samples_per_update * global_step) / (model.collector.total_steps - n_initial_samples)
+                            update_sample_ratio = (N_SAMPLES_PER_UPDATE * model.global_step) / \
+                                                  (model.collector.total_steps - n_initial_samples)
                         except ZeroDivisionError:
                             update_sample_ratio = UPDATE_SAMPLE_RATIO
                         epoch_soft_q_loss += (soft_q_loss - epoch_soft_q_loss) / (i + 1)
                         epoch_policy_loss += (policy_loss - epoch_policy_loss) / (i + 1)
                         epoch_alpha += (alpha - epoch_alpha) / (i + 1)
-                        train_writer.add_scalar(tag='train/soft_q_loss', scalar_value=soft_q_loss, global_step=global_step)
-                        train_writer.add_scalar(tag='train/policy_loss', scalar_value=policy_loss, global_step=global_step)
-                        train_writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha, global_step=global_step)
-                        train_writer.add_scalar(tag='train/action_scale', scalar_value=info['action_scale'], global_step=global_step)
-                        train_writer.add_scalar(tag='train/buffer_size', scalar_value=buffer_size, global_step=global_step)
-                        train_writer.add_scalar(tag='train/update_sample_ratio', scalar_value=update_sample_ratio, global_step=global_step)
-                        pbar.set_postfix(OrderedDict([('global_step', global_step),
+                        train_writer.add_scalar(tag='train/soft_q_loss', scalar_value=soft_q_loss,
+                                                global_step=model.global_step)
+                        train_writer.add_scalar(tag='train/policy_loss', scalar_value=policy_loss,
+                                                global_step=model.global_step)
+                        train_writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha,
+                                                global_step=model.global_step)
+                        train_writer.add_scalar(tag='train/buffer_size', scalar_value=buffer_size,
+                                                global_step=model.global_step)
+                        train_writer.add_scalar(tag='train/update_sample_ratio', scalar_value=update_sample_ratio,
+                                                global_step=model.global_step)
+                        pbar.set_postfix(OrderedDict([('global_step', model.global_step),
                                                       ('soft_q_loss', epoch_soft_q_loss),
                                                       ('policy_loss', epoch_policy_loss),
                                                       ('n_samples', f'{model.collector.total_steps:.2E}'),
-                                                      ('update_sample_ratio', f'{update_sample_ratio:.1f}')]))
+                                                      ('update/sample', f'{update_sample_ratio:.1f}')]))
                         if update_sample_ratio < UPDATE_SAMPLE_RATIO:
                             model.collector.pause()
                         else:

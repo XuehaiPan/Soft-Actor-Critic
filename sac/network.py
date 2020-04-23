@@ -50,8 +50,7 @@ class ActionScaler(NetworkBase):
     @property
     def action_scale(self):
         with torch.no_grad():
-            eigenvalues = self.scaler.weight.eig(eigenvectors=False).eigenvalues
-        return eigenvalues.abs().cpu().numpy()
+            return self.scaler.weight.det().item()
 
 
 class ValueNetwork(VanillaNeuralNetwork):

@@ -117,6 +117,8 @@ class Trainer(ModelBase):
         self.soft_q_criterion_1 = nn.MSELoss()
         self.soft_q_criterion_2 = nn.MSELoss()
 
+        self.global_step = 0
+
         self.optimizer = optim.Adam(itertools.chain(self.state_encoder.parameters(),
                                                     self.soft_q_net_1.parameters(),
                                                     self.soft_q_net_2.parameters(),
@@ -183,9 +185,9 @@ class Trainer(ModelBase):
         sync_params(src_net=self.soft_q_net_1, dst_net=self.target_soft_q_net_1, soft_tau=soft_tau)
         sync_params(src_net=self.soft_q_net_2, dst_net=self.target_soft_q_net_2, soft_tau=soft_tau)
 
-        info = {
-            'action_scale': (self.soft_q_net_1.action_scale + self.soft_q_net_2.action_scale) / 2.0
-        }
+        self.global_step += 1
+
+        info = {}
         return soft_q_loss.item(), policy_loss.item(), alpha.item(), info
 
     def load_model(self, path):
