@@ -11,29 +11,30 @@ __all__ = ['ReplayBuffer', 'TrajectoryReplayBuffer']
 
 
 class ReplayBuffer(object):
-    def __init__(self, capacity=None, initializer=list, lock=mp.Lock()):
+    def __init__(self, capacity=None, initializer=list, Value=mp.Value, Lock=mp.Lock):
         self.capacity = (capacity or np.inf)
         self.buffer = initializer()
-        self.lock = lock
-        self.offset = len(self.buffer)
+        self.buffer_offset = Value('i', value=0)
+        self.lock = Lock()
 
     def push(self, *args):
+        item = tuple(args)
         with self.lock:
-            if len(self.buffer) < self.capacity:
-                self.buffer.append(tuple(args))
+            if self.size < self.capacity:
+                self.buffer.append(item)
             else:
-                self.buffer[self.offset] = tuple(args)
+                self.buffer[self.offset] = item
             self.offset += 1
             if not np.isinf(self.capacity):
                 self.offset %= self.capacity
 
     def extend(self, trajectory):
         with self.lock:
-            for items in trajectory:
-                if len(self.buffer) < self.capacity:
-                    self.buffer.append(tuple(items))
+            for items in map(tuple, trajectory):
+                if self.size < self.capacity:
+                    self.buffer.append(items)
                 else:
-                    self.buffer[self.offset] = tuple(items)
+                    self.buffer[self.offset] = items
                 self.offset += 1
                 if not np.isinf(self.capacity):
                     self.offset %= self.capacity
@@ -53,6 +54,14 @@ class ReplayBuffer(object):
     @property
     def size(self):
         return len(self.buffer)
+
+    @property
+    def offset(self):
+        return self.buffer_offset.get()
+
+    @offset.setter
+    def offset(self, value):
+        self.buffer_offset.set(value=value)
 
 
 class TrajectoryReplayBuffer(ReplayBuffer):

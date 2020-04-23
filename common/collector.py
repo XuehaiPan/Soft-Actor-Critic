@@ -58,6 +58,8 @@ class Sampler(mp.Process):
 
         self.log_dir = log_dir
 
+        self.render()
+
     def run(self):
         if not self.random_sample:
             state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
@@ -114,10 +116,10 @@ class Sampler(mp.Process):
         if self.writer is not None:
             self.writer.close()
 
-    def render(self):
+    def render(self, mode='human', **kwargs):
         if self.render_env:
             try:
-                self.env.render()
+                return self.env.render(mode=mode, **kwargs)
             except Exception:
                 pass
 
@@ -132,13 +134,10 @@ class Sampler(mp.Process):
 
 class TrajectorySampler(Sampler):
     def run(self):
-        if not self.random_sample:
-            state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-            policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
-            state_encoder.eval()
-            policy_net.eval()
-        else:
-            state_encoder = policy_net = None
+        state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+        policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+        state_encoder.eval()
+        policy_net.eval()
 
         episode = 0
         while episode < self.n_episodes:
@@ -210,7 +209,8 @@ class CollectorBase(object):
 
         self.n_samplers = n_samplers
         self.sampler = sampler
-        self.replay_buffer = replay_buffer(capacity=buffer_capacity, initializer=self.manager.list, lock=self.manager.Lock())
+        self.replay_buffer = replay_buffer(capacity=buffer_capacity, initializer=self.manager.list,
+                                           Value=self.manager.Value, Lock=self.manager.Lock)
 
         self.env = env
         self.devices = [device for _, device in zip(range(n_samplers), itertools.cycle(devices))]
