@@ -285,8 +285,8 @@ def main():
 
         try:
             train_writer = SummaryWriter(log_dir=os.path.join(LOG_DIR, 'trainer'), comment='trainer')
-            n_initial_samples = model.collector.total_steps
-            while model.collector.total_steps == n_initial_samples:
+            n_initial_samples = model.collector.n_total_steps
+            while model.collector.n_total_steps == n_initial_samples:
                 time.sleep(0.1)
 
             for epoch in range(INITIAL_EPOCH + 1, N_EPOCHS + 1):
@@ -307,7 +307,7 @@ def main():
                         buffer_size = model.replay_buffer.size
                         try:
                             update_sample_ratio = (N_SAMPLES_PER_UPDATE * model.global_step) / \
-                                                  (model.collector.total_steps - n_initial_samples)
+                                                  (model.collector.n_total_steps - n_initial_samples)
                         except ZeroDivisionError:
                             update_sample_ratio = UPDATE_SAMPLE_RATIO
                         epoch_soft_q_loss += (soft_q_loss - epoch_soft_q_loss) / (i + 1)
@@ -326,7 +326,7 @@ def main():
                         pbar.set_postfix(OrderedDict([('global_step', model.global_step),
                                                       ('soft_q_loss', epoch_soft_q_loss),
                                                       ('policy_loss', epoch_policy_loss),
-                                                      ('n_samples', f'{model.collector.total_steps:.2E}'),
+                                                      ('n_samples', f'{model.collector.n_total_steps:.2E}'),
                                                       ('update/sample', f'{update_sample_ratio:.1f}')]))
                         if update_sample_ratio < UPDATE_SAMPLE_RATIO:
                             model.collector.pause()

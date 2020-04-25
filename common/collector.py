@@ -20,8 +20,9 @@ __all__ = ['Collector', 'TrajectoryCollector']
 class Sampler(mp.Process):
     def __init__(self, rank, n_samplers, lock,
                  running_event, event, next_sampler_event,
-                 env, state_encoder, policy_net, eval_only,
-                 replay_buffer, episode_steps, episode_rewards,
+                 env, state_encoder, policy_net,
+                 eval_only, replay_buffer,
+                 total_steps, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
                  deterministic, random_sample, render,
                  device, random_seed, log_dir):
@@ -42,6 +43,7 @@ class Sampler(mp.Process):
         self.eval_only = eval_only
 
         self.replay_buffer = replay_buffer
+        self.total_steps = total_steps
         self.episode_steps = episode_steps
         self.episode_rewards = episode_rewards
 
@@ -101,6 +103,7 @@ class Sampler(mp.Process):
             self.event.wait()
             with self.lock:
                 self.replay_buffer.extend(trajectory)
+                self.total_steps.set(value=self.total_steps.get() + episode_steps)
                 self.episode_steps.append(episode_steps)
                 self.episode_rewards.append(episode_reward)
             self.event.clear()
@@ -177,6 +180,7 @@ class TrajectorySampler(Sampler):
             self.event.wait()
             with self.lock:
                 self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))), hiddens)
+                self.total_steps.set(value=self.total_steps.get() + episode_steps)
                 self.episode_steps.append(episode_steps)
                 self.episode_rewards.append(episode_reward)
             self.event.clear()
@@ -199,6 +203,7 @@ class CollectorBase(object):
         self.manager = mp.Manager()
         self.running_event = self.manager.Event()
         self.running_event.set()
+        self.total_steps = self.manager.Value('i', value=0)
         self.episode_steps = self.manager.list()
         self.episode_rewards = self.manager.list()
         self.lock = self.manager.Lock()
@@ -221,8 +226,8 @@ class CollectorBase(object):
         return len(self.episode_steps)
 
     @property
-    def total_steps(self):
-        return sum(self.episode_steps)
+    def n_total_steps(self):
+        return self.total_steps.get()
 
     def async_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
                      render=False, log_dir=None):
@@ -237,8 +242,9 @@ class CollectorBase(object):
         for rank in range(self.n_samplers):
             sampler = self.sampler(rank, self.n_samplers, self.lock,
                                    self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
-                                   self.env, self.state_encoder, self.policy_net, self.eval_only,
-                                   self.replay_buffer, self.episode_steps, self.episode_rewards,
+                                   self.env, self.state_encoder, self.policy_net,
+                                   self.eval_only, self.replay_buffer,
+                                   self.total_steps, self.episode_steps, self.episode_rewards,
                                    n_episodes, max_episode_steps,
                                    deterministic, random_sample, render,
                                    self.devices[rank], self.random_seed + rank, log_dir)
