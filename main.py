@@ -154,6 +154,8 @@ try:
     MAX_EPISODE_STEPS = min(MAX_EPISODE_STEPS, ENV.spec.max_episode_steps)
 except AttributeError:
     pass
+except TypeError:
+    pass
 RENDER = args.render
 
 N_EPISODES = args.n_episodes
@@ -189,12 +191,6 @@ if args.gpu is not None and torch.cuda.is_available():
     DEVICES = [torch.device(f'cuda:{cuda_device}') for cuda_device in args.gpu]
 else:
     DEVICES = [torch.device('cpu')]
-
-RANDOM_SEED = args.random_seed
-random.seed(RANDOM_SEED)
-np.random.seed(RANDOM_SEED)
-torch.manual_seed(RANDOM_SEED)
-ENV.seed(RANDOM_SEED)
 
 LOG_DIR = args.log_dir
 CHECKPOINT_DIR = args.checkpoint_dir

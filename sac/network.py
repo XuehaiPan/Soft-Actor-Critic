@@ -12,7 +12,7 @@ DEVICE_CPU = torch.device('cpu')
 
 
 class StateEncoderWrapper(NetworkBase):
-    def __init__(self, encoder, device):
+    def __init__(self, encoder, device=DEVICE_CPU):
         super().__init__()
 
         self.encoder = encoder

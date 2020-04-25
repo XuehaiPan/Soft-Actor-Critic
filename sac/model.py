@@ -30,7 +30,8 @@ class ModelBase(object):
                                          activation=activation, device=self.model_device)
         self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims,
                                          activation=activation, device=self.model_device)
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims, activation=activation, device=self.model_device)
+        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims,
+                                        activation=activation, device=self.model_device)
 
         self.log_alpha = nn.Parameter(torch.tensor([[np.log(initial_alpha)]], dtype=torch.float32, device=self.model_device),
                                       requires_grad=True)
