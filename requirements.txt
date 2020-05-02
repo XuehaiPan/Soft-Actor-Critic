@@ -1,5 +1,8 @@
 numpy
 tqdm
 pytorch
+torchvision
 tensorboard
 gym
+pillow
+moviepy

@@ -60,6 +60,8 @@ class Sampler(mp.Process):
 
         self.log_dir = log_dir
 
+        self.episode = 0
+        self.frames = []
         self.render()
 
     def run(self):
@@ -71,8 +73,10 @@ class Sampler(mp.Process):
         else:
             state_encoder = policy_net = None
 
-        episode = 0
-        while episode < self.n_episodes:
+        self.episode = 0
+        while self.episode < self.n_episodes:
+            self.episode += 1
+
             if not (self.eval_only or self.random_sample):
                 sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
                 sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
@@ -82,6 +86,8 @@ class Sampler(mp.Process):
             trajectory = []
             observation = self.env.reset()
             self.render()
+            self.frames.clear()
+            self.save_frame()
             for step in range(self.max_episode_steps):
                 if self.random_sample:
                     action = self.env.action_space.sample()
@@ -90,6 +96,7 @@ class Sampler(mp.Process):
                     action = policy_net.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
+                self.save_frame()
 
                 episode_reward += reward
                 episode_steps += 1
@@ -108,12 +115,12 @@ class Sampler(mp.Process):
                 self.episode_rewards.append(episode_reward)
             self.event.clear()
             self.next_sampler_event.set()
-            episode += 1
             if self.writer is not None:
                 average_reward = episode_reward / episode_steps
-                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
-                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
-                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
+                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.episode)
+                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.episode)
+                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.episode)
+                self.log_video()
                 self.writer.flush()
 
         if self.writer is not None:
@@ -124,6 +131,22 @@ class Sampler(mp.Process):
             try:
                 return self.env.render(mode=mode, **kwargs)
             except Exception:
+                pass
+
+    def save_frame(self):
+        if not self.random_sample and self.rank == 0 and self.episode % 100 == 0:
+            try:
+                self.frames.append(self.env.render(mode='rgb_array'))
+            except Exception:
+                pass
+
+    def log_video(self):
+        if self.writer is not None and self.rank == 0 and self.episode % 100 == 0:
+            try:
+                video = np.stack(self.frames).transpose((0, 3, 1, 2))
+                video = np.expand_dims(video, axis=0)
+                self.writer.add_video(tag='sample/episode', vid_tensor=video, global_step=self.episode, fps=120)
+            except ValueError:
                 pass
 
     @property
@@ -142,8 +165,10 @@ class TrajectorySampler(Sampler):
         state_encoder.eval()
         policy_net.eval()
 
-        episode = 0
-        while episode < self.n_episodes:
+        self.episode = 0
+        while self.episode < self.n_episodes:
+            self.episode += 1
+
             if not (self.eval_only or self.random_sample):
                 sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
                 sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
@@ -154,7 +179,9 @@ class TrajectorySampler(Sampler):
             hiddens = []
             hidden = policy_net.initial_hiddens(batch_size=1)
             observation = self.env.reset()
+            self.frames.clear()
             self.render()
+            self.save_frame()
             for step in range(self.max_episode_steps):
                 hiddens.append(hidden)
 
@@ -165,6 +192,7 @@ class TrajectorySampler(Sampler):
                     action, hidden = policy_net.get_action(state, hidden, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
+                self.save_frame()
 
                 episode_reward += reward
                 episode_steps += 1
@@ -185,12 +213,12 @@ class TrajectorySampler(Sampler):
                 self.episode_rewards.append(episode_reward)
             self.event.clear()
             self.next_sampler_event.set()
-            episode += 1
             if self.writer is not None:
                 average_reward = episode_reward / episode_steps
-                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=episode)
-                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=episode)
-                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=episode)
+                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.episode)
+                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.episode)
+                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.episode)
+                self.log_video()
                 self.writer.flush()
 
         if self.writer is not None:
