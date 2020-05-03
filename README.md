@@ -12,13 +12,17 @@ cd Soft-Actor-Critic
 pip3 install -r requirements.txt
 
 # modify hyperparameters before running
-# train/test FC controller
+# train/test FC controller with FC state encoder
 bash scripts/train_fc.sh
 bash scripts/test_fc.sh
 
-# train/test RNN controller
+# train/test FC controller with RNN state encoder
 bash scripts/train_rnn.sh
 bash scripts/test_rnn.sh
+
+# train/test FC controller with CNN state encoder
+bash scripts/train_cnn.sh
+bash scripts/test_cnn.sh
 ```
 
 You can use `python3 main.py --help` for more details:
