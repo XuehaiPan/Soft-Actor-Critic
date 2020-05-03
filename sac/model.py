@@ -125,6 +125,11 @@ class Trainer(ModelBase):
                                                     self.soft_q_net_2.parameters(),
                                                     self.policy_net.parameters()),
                                     lr=soft_q_lr, weight_decay=weight_decay)
+        for param_group in self.optimizer.param_groups:
+            n_params = 0
+            for param in param_group['params']:
+                n_params += param.size().numel()
+            param_group['n_params'] = n_params
         self.policy_loss_weight = policy_lr / soft_q_lr
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
@@ -180,6 +185,9 @@ class Trainer(ModelBase):
         loss = soft_q_loss + self.policy_loss_weight * policy_loss
         self.optimizer.zero_grad()
         loss.backward()
+        for param_group in self.optimizer.param_groups:
+            nn.utils.clip_grad.clip_grad_norm_(param_group['params'],
+                                               max_norm=0.1 * np.sqrt(param_group['n_params']), norm_type=2)
         self.optimizer.step()
 
         # Soft update the target value net
