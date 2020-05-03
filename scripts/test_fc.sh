@@ -10,9 +10,10 @@ ROOT_DIR="$(
 cd "$ROOT_DIR"
 
 PYTHONWARNINGS=ignore python3 main.py \
-	--mode test --gpu 0 1 2 3 --env "$ENV" --render \
-	--net FC --activation LeakyReLU \
-	--hidden-dims 128 128 64 64 \
+	--mode test --gpu 0 1 2 3 --env "$ENV" \
+	--hidden-dims 128 64 \
+	--activation LeakyReLU \
+	--encoder-arch FC \
 	--state-dim 128 \
 	--encoder-hidden-dims 128 128 \
 	--n-episodes 100 \

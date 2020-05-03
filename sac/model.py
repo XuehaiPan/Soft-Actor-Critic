@@ -10,12 +10,14 @@ from common.utils import clone_network, sync_params
 from sac.network import SoftQNetwork, PolicyNetwork, StateEncoderWrapper
 
 
-__all__ = ['ModelBase', 'Trainer', 'Tester']
+__all__ = ['ModelBase', 'TrainerBase', 'Trainer', 'Tester']
 
 
 class ModelBase(object):
-    def __init__(self, env, state_encoder, state_dim, action_dim, hidden_dims, activation,
-                 initial_alpha, n_samplers, buffer_capacity, devices, random_seed=0):
+    def __init__(self, env, state_encoder, state_encoder_wrapper,
+                 state_dim, action_dim, hidden_dims, activation,
+                 initial_alpha, n_samplers, collector, buffer_capacity,
+                 devices, random_seed=0):
         self.devices = itertools.cycle(devices)
         self.model_device = next(self.devices)
 
@@ -24,7 +26,7 @@ class ModelBase(object):
 
         self.training = True
 
-        self.state_encoder = StateEncoderWrapper(state_encoder, device=self.model_device)
+        self.state_encoder = state_encoder_wrapper(state_encoder, device=self.model_device)
 
         self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims,
                                          activation=activation, device=self.model_device)
@@ -45,7 +47,7 @@ class ModelBase(object):
         ])
         self.modules.share_memory()
 
-        self.collector = Collector(state_encoder=self.state_encoder,
+        self.collector = collector(state_encoder=self.state_encoder,
                                    policy_net=self.policy_net,
                                    env=env,
                                    buffer_capacity=buffer_capacity,
@@ -103,12 +105,15 @@ class ModelBase(object):
         self.modules.load_state_dict(torch.load(path, map_location=self.model_device))
 
 
-class Trainer(ModelBase):
-    def __init__(self, env, state_encoder, state_dim, action_dim, hidden_dims, activation,
+class TrainerBase(ModelBase):
+    def __init__(self, env, state_encoder, state_encoder_wrapper,
+                 state_dim, action_dim, hidden_dims, activation,
                  initial_alpha, soft_q_lr, policy_lr, alpha_lr, weight_decay,
-                 n_samplers, buffer_capacity, devices, random_seed=None):
-        super().__init__(env, state_encoder, state_dim, action_dim, hidden_dims, activation,
-                         initial_alpha, n_samplers, buffer_capacity, devices, random_seed)
+                 n_samplers, collector, buffer_capacity, devices, random_seed=0):
+        super().__init__(env, state_encoder, state_encoder_wrapper,
+                         state_dim, action_dim, hidden_dims, activation,
+                         initial_alpha, n_samplers, collector, buffer_capacity,
+                         devices, random_seed)
 
         self.target_soft_q_net_1 = clone_network(src_net=self.soft_q_net_1, device=self.model_device)
         self.target_soft_q_net_2 = clone_network(src_net=self.soft_q_net_2, device=self.model_device)
@@ -135,19 +140,10 @@ class Trainer(ModelBase):
 
         self.train(mode=True)
 
-    def update(self, batch_size, normalize_rewards=True, reward_scale=1.0,
-               adaptive_entropy=True, target_entropy=-2.0,
-               gamma=0.99, soft_tau=0.01, epsilon=1E-6):
-        self.train()
-
-        # size: (batch_size, item_size)
-        observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.to(self.model_device),
-                                                                        self.replay_buffer.sample(batch_size)))
-
-        state = self.state_encoder(observation)
-        with torch.no_grad():
-            next_state = self.state_encoder(next_observation)
-
+    def update_sac(self, state, action, reward, next_state, done,
+                   normalize_rewards=True, reward_scale=1.0,
+                   adaptive_entropy=True, target_entropy=-2.0,
+                   gamma=0.99, soft_tau=0.01, epsilon=1E-6):
         # Normalize rewards
         if normalize_rewards:
             with torch.no_grad():
@@ -199,6 +195,24 @@ class Trainer(ModelBase):
         info = {}
         return soft_q_loss.item(), policy_loss.item(), alpha.item(), info
 
+    def update(self, batch_size, normalize_rewards=True, reward_scale=1.0,
+               adaptive_entropy=True, target_entropy=-2.0,
+               gamma=0.99, soft_tau=0.01, epsilon=1E-6):
+        self.train()
+
+        # size: (batch_size, item_size)
+        observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.to(self.model_device),
+                                                                        self.replay_buffer.sample(batch_size)))
+
+        state = self.state_encoder(observation)
+        with torch.no_grad():
+            next_state = self.state_encoder(next_observation)
+
+        return self.update_sac(state, action, reward, next_state, done,
+                               normalize_rewards, reward_scale,
+                               adaptive_entropy, target_entropy,
+                               gamma, soft_tau, epsilon)
+
     def load_model(self, path):
         super().load_model(path=path)
         self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
@@ -207,8 +221,17 @@ class Trainer(ModelBase):
         self.target_soft_q_net_2.eval()
 
 
+class Trainer(TrainerBase):
+    def __init__(self, *args, **kwargs):
+        kwargs.update(state_encoder_wrapper=StateEncoderWrapper,
+                      collector=Collector)
+        super().__init__(*args, **kwargs)
+
+
 class Tester(ModelBase):
     def __init__(self, *args, **kwargs):
+        kwargs.update(state_encoder_wrapper=StateEncoderWrapper,
+                      collector=Collector)
         super().__init__(*args, **kwargs)
 
         self.eval()

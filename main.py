@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+
 import argparse
 import glob
 import os
 import random
 import re
+import sys
 import time
 from collections import OrderedDict
 
@@ -18,7 +21,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from common.environment import FlattenedAction, NormalizedAction, \
     FlattenedObservation, ConcatenatedObservation
-from common.network_base import VanillaNeuralNetwork
+from common.network_base import VanillaNeuralNetwork, VanillaRecurrentNeuralNetwork
 
 
 mpl.use('Agg')
@@ -37,34 +40,33 @@ parser.add_argument('--gpu', type=int, default=None, nargs='+', metavar='CUDA_DE
                     help='GPU devices (use CPU if not present)')
 parser.add_argument('--env', type=str, default='BipedalWalker-v3',
                     help='environment to train on (default: BipedalWalker-v3)')
+parser.add_argument('--n-frames', type=int, default=1,
+                    help='concatenate original N consecutive observations as a new observation (default: 1)')
 parser.add_argument('--render', action='store_true',
                     help='render the environment')
-parser.add_argument('--net', type=str, choices=['FC', 'RNN'], default='FC',
-                    help='architecture of controller network')
+parser.add_argument('--hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
+                    help='hidden dimensions of FC controller')
 parser.add_argument('--activation', type=str, choices=['ReLU', 'LeakyReLU'], default='ReLU',
                     help='activation function in networks (default: ReLU)')
-parser.add_argument('--deterministic', action='store_true', help='deterministic in evaluation')
-fc_group = parser.add_argument_group('FC controller')
-fc_group.add_argument('--hidden-dims', type=int, default=[], nargs='+',
-                      help='hidden dimensions of FC controller')
-rnn_group = parser.add_argument_group('RNN controller')
-rnn_group.add_argument('--hidden-dims-before-lstm', type=int, default=[], nargs='+',
-                       help='hidden FC dimensions before LSTM layers in RNN controller')
-rnn_group.add_argument('--hidden-dims-lstm', type=int, default=[], nargs='+',
-                       help='LSTM hidden dimensions of RNN controller')
-rnn_group.add_argument('--hidden-dims-after-lstm', type=int, default=[], nargs='+',
-                       help='hidden FC dimensions after LSTM layers in RNN controller')
-rnn_group.add_argument('--skip-connection', action='store_true', default=False,
-                       help='add skip connection beside LSTM layers in RNN controller')
-rnn_group.add_argument('--step-size', type=int, default=16,
-                       help='number of continuous steps for update (default: 16)')
 encoder_group = parser.add_argument_group('state encoder')
-encoder_group.add_argument('--n-frames', type=int, default=1,
-                           help='concatenate original N consecutive observations as a new observation (default: 1)')
-encoder_group.add_argument('--state-dim', type=int, default=None,
+encoder_group.add_argument('--encoder-arch', type=str, choices=['FC', 'RNN'], default='FC',
+                           help='architecture of state encoder network')
+encoder_group.add_argument('--state-dim', type=int, default=None, metavar='DIM',
                            help='target state dimension of encoded state (use env.observation_space.shape if not present)')
-encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs='+',
-                           help='hidden dimensions of FC state encoder')
+fc_encoder_group = parser.add_argument_group('FC state encoder')
+fc_encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
+                              help='hidden dimensions of FC state encoder')
+rnn_encoder_group = parser.add_argument_group('RNN state encoder')
+rnn_encoder_group.add_argument('--encoder-hidden-dims-before-lstm', type=int, default=[], nargs='+', metavar='DIM',
+                               help='hidden FC dimensions before LSTM layers in RNN state encoder')
+rnn_encoder_group.add_argument('--encoder-hidden-dims-lstm', type=int, default=[], nargs='+', metavar='DIM',
+                               help='LSTM hidden dimensions of RNN controller')
+rnn_encoder_group.add_argument('--encoder-hidden-dims-after-lstm', type=int, default=[], nargs='+', metavar='DIM',
+                               help='hidden FC dimensions after LSTM layers in RNN state encoder')
+rnn_encoder_group.add_argument('--skip-connection', action='store_true', default=False,
+                               help='add skip connection beside LSTM layers in RNN state encoder')
+rnn_encoder_group.add_argument('--step-size', type=int, default=16,
+                               help='number of continuous steps for update (default: 16)')
 parser.add_argument('--max-episode-steps', type=int, default=10000,
                     help='max steps per episode (default: 10000)')
 parser.add_argument('--n-epochs', type=int, default=1000,
@@ -77,18 +79,19 @@ parser.add_argument('--batch-size', type=int, default=256,
                     help='batch size (default: 256)')
 parser.add_argument('--n-samplers', type=int, default=4,
                     help='number of parallel samplers (default: 4)')
-parser.add_argument('--buffer-capacity', type=int, default=1000000,
+parser.add_argument('--buffer-capacity', type=int, default=1000000, metavar='CAPACITY',
                     help='capacity of replay buffer (default: 1000000)')
-parser.add_argument('--update-sample-ratio', type=float, default=2.0,
+parser.add_argument('--update-sample-ratio', type=float, default=2.0, metavar='RATIO',
                     help='speed ratio of training and sampling (default: 2.0)')
 parser.add_argument('--gamma', type=float, default=0.99,
                     help='discount factor for rewards (default: 0.99)')
-parser.add_argument('--soft-tau', type=float, default=0.01,
+parser.add_argument('--soft-tau', type=float, default=0.01, metavar='TAU',
                     help='soft update factor for target networks (default: 0.01)')
 parser.add_argument('--normalize-rewards', action='store_true',
                     help='normalize rewards for training')
-parser.add_argument('--reward-scale', type=float, default=1.0,
+parser.add_argument('--reward-scale', type=float, default=1.0, metavar='SCALE',
                     help='reward scale factor for normalized rewards (default: 1.0)')
+parser.add_argument('--deterministic', action='store_true', help='deterministic in evaluation')
 lr_group = parser.add_argument_group('learning rate')
 lr_group.add_argument('--lr', type=float, default=1E-4,
                       help='learning rate (can be override by the following specific learning rate) (default: 0.0001)')
@@ -99,21 +102,24 @@ lr_group.add_argument('--policy-lr', type=float, default=None,
 alpha_group = parser.add_argument_group('temperature parameter')
 alpha_group.add_argument('--alpha-lr', type=float, default=None,
                          help='learning rate for temperature parameter (use POLICY_LR above if not present)')
-alpha_group.add_argument('--initial-alpha', type=float, default=1.0,
+alpha_group.add_argument('--initial-alpha', type=float, default=1.0, metavar='ALPHA',
                          help='initial value of temperature parameter (default: 1.0)')
 alpha_group.add_argument('--adaptive-entropy', action='store_true',
                          help='auto update temperature parameter while training')
 parser.add_argument('--weight-decay', type=float, default=0.0,
                     help='weight decay (default: 0.0)')
-parser.add_argument('--random-seed', type=int, default=0,
+parser.add_argument('--random-seed', type=int, default=0, metavar='SEED',
                     help='random seed (default: 0)')
 parser.add_argument('--log-dir', type=str, default=os.path.join(ROOT_DIR, 'logs'),
-                    help='folder to save tensorboard logs')
+                    help='folder to save TensorBoard logs')
 parser.add_argument('--checkpoint-dir', type=str, default=os.path.join(ROOT_DIR, 'checkpoints'),
-                    help='folder to save checkpoint from')
+                    help='folder to save checkpoint')
 parser.add_argument('--load-checkpoint', action='store_true',
                     help='load latest checkpoint in checkpoint dir')
 args = parser.parse_args()
+if len(sys.argv) == 1:
+    parser.print_help()
+    exit()
 
 MODE = args.mode
 
@@ -122,15 +128,7 @@ random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 
-USE_LSTM = (args.net == 'RNN')
-if USE_LSTM:
-    HIDDEN_DIMS_BEFORE_LSTM = args.hidden_dims_before_lstm
-    HIDDEN_DIMS_AFTER_LSTM = args.hidden_dims_after_lstm
-    HIDDEN_DIMS_LSTM = args.hidden_dims_lstm
-    SKIP_CONNECTION = args.skip_connection
-    STEP_SIZE = args.step_size
-else:
-    HIDDEN_DIMS = args.hidden_dims
+HIDDEN_DIMS = args.hidden_dims
 
 if args.activation == 'ReLU':
     ACTIVATION = F.relu
@@ -144,14 +142,25 @@ ENV = FlattenedObservation(NormalizedAction(FlattenedAction(ENV)))
 ACTION_DIM = ENV.action_space.shape[0]
 if args.n_frames > 1:
     ENV = ConcatenatedObservation(ENV, n_frames=args.n_frames, dim=0)
+RENDER = args.render
+
+FC_ENCODER = (args.encoder_arch == 'FC')
+RNN_ENCODER = (args.encoder_arch == 'RNN')
 ENV_OBSERVATION_DIM = ENV.observation_space.shape[0]
 STATE_DIM = (args.state_dim or ENV_OBSERVATION_DIM)
+if FC_ENCODER:
+    if args.state_dim is not None or len(args.encoder_hidden_dims) > 0:
+        STATE_ENCODER = VanillaNeuralNetwork(n_dims=[ENV_OBSERVATION_DIM, *args.encoder_hidden_dims, STATE_DIM],
+                                             activation=ACTIVATION, output_activation=None)
+    else:
+        STATE_ENCODER = nn.Identity()
+elif RNN_ENCODER:
+    STATE_ENCODER = VanillaRecurrentNeuralNetwork(n_dims_before_lstm=[ENV_OBSERVATION_DIM, *args.encoder_hidden_dims_before_lstm],
+                                                  n_dims_lstm_hidden=args.encoder_hidden_dims_lstm,
+                                                  n_dims_after_lstm=[*args.encoder_hidden_dims_after_lstm, STATE_DIM],
+                                                  skip_connection=args.skip_connection,
+                                                  activation=ACTIVATION, output_activation=None)
 
-if args.state_dim is not None or len(args.encoder_hidden_dims) > 0:
-    STATE_ENCODER = VanillaNeuralNetwork(n_dims=[ENV_OBSERVATION_DIM, *args.encoder_hidden_dims, STATE_DIM],
-                                         activation=ACTIVATION, output_activation=None)
-else:
-    STATE_ENCODER = nn.Identity()
 MAX_EPISODE_STEPS = args.max_episode_steps
 try:
     MAX_EPISODE_STEPS = min(MAX_EPISODE_STEPS, ENV.spec.max_episode_steps)
@@ -159,7 +168,6 @@ except AttributeError:
     pass
 except TypeError:
     pass
-RENDER = args.render
 
 N_EPISODES = args.n_episodes
 N_EPOCHS = args.n_epochs
@@ -172,12 +180,12 @@ GAMMA = args.gamma
 SOFT_TAU = args.soft_tau
 NORMALIZE_REWARDS = args.normalize_rewards
 REWARD_SCALE = args.reward_scale
+DETERMINISTIC = args.deterministic
 
 N_SAMPLES_PER_UPDATE = BATCH_SIZE
-if USE_LSTM:
+STEP_SIZE = args.step_size
+if RNN_ENCODER:
     N_SAMPLES_PER_UPDATE *= STEP_SIZE
-
-DETERMINISTIC = args.deterministic
 
 LR = args.lr
 SOFT_Q_LR = (args.soft_q_lr or LR)
@@ -217,15 +225,6 @@ def main():
     model_kwargs = {}
     update_kwargs = {}
     initial_random_sample = True
-    if not USE_LSTM:
-        model_kwargs.update({'hidden_dims': HIDDEN_DIMS})
-    else:
-        model_kwargs.update({
-            'hidden_dims_before_lstm': HIDDEN_DIMS_BEFORE_LSTM,
-            'hidden_dims_lstm': HIDDEN_DIMS_LSTM,
-            'hidden_dims_after_lstm': HIDDEN_DIMS_AFTER_LSTM,
-            'skip_connection': SKIP_CONNECTION
-        })
 
     if MODE == 'train':
         model_kwargs.update({
@@ -235,14 +234,14 @@ def main():
             'weight_decay': WEIGHT_DECAY
         })
 
-        if not USE_LSTM:
+        if not RNN_ENCODER:
             from sac.model import Trainer as Model
         else:
             from sac.rnn.model import Trainer as Model
             initial_random_sample = False
             update_kwargs.update({'step_size': STEP_SIZE})
     else:
-        if not USE_LSTM:
+        if not RNN_ENCODER:
             from sac.model import Tester as Model
         else:
             from sac.rnn.model import Tester as Model
@@ -251,6 +250,7 @@ def main():
                   state_encoder=STATE_ENCODER,
                   state_dim=STATE_DIM,
                   action_dim=ACTION_DIM,
+                  hidden_dims=HIDDEN_DIMS,
                   activation=ACTIVATION,
                   initial_alpha=INITIAL_ALPHA,
                   n_samplers=N_SAMPLERS,

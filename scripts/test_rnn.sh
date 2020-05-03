@@ -10,14 +10,15 @@ ROOT_DIR="$(
 cd "$ROOT_DIR"
 
 PYTHONWARNINGS=ignore python3 main.py \
-	--mode test --gpu 0 1 2 3 --env "$ENV" --render \
-	--net RNN --activation LeakyReLU \
-	--hidden-dims-before-lstm 128 \
-	--hidden-dims-lstm 128 \
-	--hidden-dims-after-lstm 64 \
-	--skip-connection \
+	--mode test --gpu 0 1 2 3 --env "$ENV" \
+	--hidden-dims 128 64 \
+	--activation LeakyReLU \
+	--encoder-arch RNN \
 	--state-dim 128 \
-	--encoder-hidden-dims 128 128 128 128 \
+	--encoder-hidden-dims-before-lstm 128 \
+	--encoder-hidden-dims-lstm 64 \
+	--encoder-hidden-dims-after-lstm 128 \
+	--skip-connection \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \

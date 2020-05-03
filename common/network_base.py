@@ -7,7 +7,8 @@ import torch.nn.functional as F
 __all__ = [
     'NetworkBase',
     'VanillaNeuralNetwork', 'VanillaNN',
-    'VanillaRecurrentNeuralNetwork', 'VanillaRNN', 'LSTMHidden',
+    'LSTMHidden', 'cat_hidden',
+    'VanillaRecurrentNeuralNetwork', 'VanillaRNN',
     'VanillaConvolutionalNetwork', 'VanillaCNN'
 ]
 
@@ -98,6 +99,9 @@ class LSTMHidden(object):
             cell = torch.cat(list(map(lambda hc: hc[1], ith_layer_hiddens)), dim=dim)
             new_hidden.append((hidden, cell))
         return LSTMHidden(hidden=new_hidden)
+
+
+cat_hidden = LSTMHidden.cat
 
 
 class VanillaRecurrentNeuralNetwork(NetworkBase):

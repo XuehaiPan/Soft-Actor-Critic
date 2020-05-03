@@ -10,6 +10,11 @@ __all__ = [
     'FlattenedObservation', 'ConcatenatedObservation'
 ]
 
+try:
+    import pybullet_envs
+except ImportError:
+    pass
+
 
 class FlattenedAction(gym.ActionWrapper):
     def __init__(self, env):

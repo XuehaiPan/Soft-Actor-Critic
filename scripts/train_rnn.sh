@@ -11,13 +11,14 @@ cd "$ROOT_DIR"
 
 PYTHONWARNINGS=ignore python3 main.py \
 	--mode train --gpu 0 1 2 3 4 --env "$ENV" \
-	--net RNN --activation LeakyReLU \
-	--hidden-dims-before-lstm 128 \
-	--hidden-dims-lstm 128 \
-	--hidden-dims-after-lstm 64 \
-	--skip-connection \
+	--hidden-dims 128 64 \
+	--activation LeakyReLU \
+	--encoder-arch RNN \
 	--state-dim 128 \
-	--encoder-hidden-dims 128 128 128 128 \
+	--encoder-hidden-dims-before-lstm 128 \
+	--encoder-hidden-dims-lstm 64 \
+	--encoder-hidden-dims-after-lstm 128 \
+	--skip-connection \
 	--max-episode-steps 500 \
 	--n-epochs 1000 --n-updates 256 --batch-size 16 --step-size 16 \
 	--n-samplers 4 \

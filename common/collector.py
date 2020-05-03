@@ -10,8 +10,8 @@ import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from common.buffer import ReplayBuffer, TrajectoryReplayBuffer
+from common.network_base import cat_hidden
 from common.utils import clone_network, sync_params
-from sac.rnn.network import cat_hidden
 
 
 __all__ = ['Collector', 'TrajectoryCollector']
@@ -177,7 +177,7 @@ class TrajectorySampler(Sampler):
             episode_steps = 0
             trajectory = []
             hiddens = []
-            hidden = policy_net.initial_hiddens(batch_size=1)
+            hidden = state_encoder.initial_hiddens(batch_size=1)
             observation = self.env.reset()
             self.frames.clear()
             self.render()
@@ -188,8 +188,8 @@ class TrajectorySampler(Sampler):
                 if self.random_sample:
                     action = self.env.action_space.sample()
                 else:
-                    state = state_encoder.encode(observation)
-                    action, hidden = policy_net.get_action(state, hidden, deterministic=self.deterministic)
+                    state = state_encoder.encode(observation, hidden=hidden)
+                    action = policy_net.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
                 self.save_frame()
