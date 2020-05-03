@@ -25,13 +25,17 @@ You can use `python3 main.py --help` for more details:
 ```
 usage: main.py [-h] [--mode {train,test}]
                [--gpu CUDA_DEVICE [CUDA_DEVICE ...]] [--env ENV]
-               [--n-frames N_FRAMES] [--render] [--hidden-dims DIM [DIM ...]]
-               [--activation {ReLU,LeakyReLU}] [--encoder-arch {FC,RNN}]
+               [--n-frames N_FRAMES] [--render] [--vision-observation]
+               [--image-size SIZE] [--hidden-dims DIM [DIM ...]]
+               [--activation {ReLU,LeakyReLU}] [--encoder-arch {FC,RNN,CNN}]
                [--state-dim DIM] [--encoder-hidden-dims DIM [DIM ...]]
                [--encoder-hidden-dims-before-lstm DIM [DIM ...]]
                [--encoder-hidden-dims-lstm DIM [DIM ...]]
                [--encoder-hidden-dims-after-lstm DIM [DIM ...]]
                [--skip-connection] [--step-size STEP_SIZE]
+               [--encoder-hidden-channels CHN [CHN ...]]
+               [--kernel-sizes K [K ...]] [--strides S [S ...]]
+               [--paddings P [P ...]] [--batch-normalization]
                [--max-episode-steps MAX_EPISODE_STEPS] [--n-epochs N_EPOCHS]
                [--n-episodes N_EPISODES] [--n-updates N_UPDATES]
                [--batch-size BATCH_SIZE] [--n-samplers N_SAMPLERS]
@@ -51,10 +55,12 @@ optional arguments:
   --mode {train,test}   mode (default: train)
   --gpu CUDA_DEVICE [CUDA_DEVICE ...]
                         GPU devices (use CPU if not present)
-  --env ENV             environment to train on (default: BipedalWalker-v3)
+  --env ENV             environment to train on (default: Pendulum-v0)
   --n-frames N_FRAMES   concatenate original N consecutive observations as a
                         new observation (default: 1)
   --render              render the environment
+  --vision-observation  use rendered images as observation
+  --image-size SIZE     image size of vision observation (default: 128)
   --hidden-dims DIM [DIM ...]
                         hidden dimensions of FC controller
   --activation {ReLU,LeakyReLU}
@@ -89,8 +95,8 @@ optional arguments:
   --load-checkpoint     load latest checkpoint in checkpoint dir
 
 state encoder:
-  --encoder-arch {FC,RNN}
-                        architecture of state encoder network
+  --encoder-arch {FC,RNN,CNN}
+                        architecture of state encoder network (default: FC)
   --state-dim DIM       target state dimension of encoded state (use
                         env.observation_space.shape if not present)
 
@@ -111,6 +117,19 @@ RNN state encoder:
                         encoder
   --step-size STEP_SIZE
                         number of continuous steps for update (default: 16)
+
+CNN state encoder:
+  --encoder-hidden-channels CHN [CHN ...]
+                        hidden CNN channels in CNN state encoder
+  --kernel-sizes K [K ...]
+                        kernel sizes of CNN layers in CNN state encoder
+                        (defaults: 3)
+  --strides S [S ...]   strides of CNN layers in CNN state encoder (defaults:
+                        1)
+  --paddings P [P ...]  paddings of CNN layers in CNN state encoder (defaults:
+                        K // 2)
+  --batch-normalization
+                        use batch normalization in CNN state encoder
 
 learning rate:
   --lr LR               learning rate (can be override by the following

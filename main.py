@@ -20,8 +20,9 @@ import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from common.environment import FlattenedAction, NormalizedAction, \
-    FlattenedObservation, ConcatenatedObservation
-from common.network_base import VanillaNeuralNetwork, VanillaRecurrentNeuralNetwork
+    FlattenedObservation, VisionObservation, ConcatenatedObservation
+from common.network_base import VanillaNeuralNetwork, VanillaRecurrentNeuralNetwork, \
+    VanillaConvolutionalNetwork
 
 
 mpl.use('Agg')
@@ -38,19 +39,23 @@ parser.add_argument('--mode', type=str, choices=['train', 'test'], default='trai
                     help='mode (default: train)')
 parser.add_argument('--gpu', type=int, default=None, nargs='+', metavar='CUDA_DEVICE',
                     help='GPU devices (use CPU if not present)')
-parser.add_argument('--env', type=str, default='BipedalWalker-v3',
-                    help='environment to train on (default: BipedalWalker-v3)')
+parser.add_argument('--env', type=str, default='Pendulum-v0',
+                    help='environment to train on (default: Pendulum-v0)')
 parser.add_argument('--n-frames', type=int, default=1,
                     help='concatenate original N consecutive observations as a new observation (default: 1)')
 parser.add_argument('--render', action='store_true',
                     help='render the environment')
+parser.add_argument('--vision-observation', action='store_true',
+                    help='use rendered images as observation')
+parser.add_argument('--image-size', type=int, default=128, metavar='SIZE',
+                    help='image size of vision observation (default: 128)')
 parser.add_argument('--hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
                     help='hidden dimensions of FC controller')
 parser.add_argument('--activation', type=str, choices=['ReLU', 'LeakyReLU'], default='ReLU',
                     help='activation function in networks (default: ReLU)')
 encoder_group = parser.add_argument_group('state encoder')
-encoder_group.add_argument('--encoder-arch', type=str, choices=['FC', 'RNN'], default='FC',
-                           help='architecture of state encoder network')
+encoder_group.add_argument('--encoder-arch', type=str, choices=['FC', 'RNN', 'CNN'], default='FC',
+                           help='architecture of state encoder network (default: FC)')
 encoder_group.add_argument('--state-dim', type=int, default=None, metavar='DIM',
                            help='target state dimension of encoded state (use env.observation_space.shape if not present)')
 fc_encoder_group = parser.add_argument_group('FC state encoder')
@@ -67,6 +72,17 @@ rnn_encoder_group.add_argument('--skip-connection', action='store_true', default
                                help='add skip connection beside LSTM layers in RNN state encoder')
 rnn_encoder_group.add_argument('--step-size', type=int, default=16,
                                help='number of continuous steps for update (default: 16)')
+cnn_encoder_group = parser.add_argument_group('CNN state encoder')
+cnn_encoder_group.add_argument('--encoder-hidden-channels', type=int, default=[], nargs='+', metavar='CHN',
+                               help='hidden CNN channels in CNN state encoder')
+cnn_encoder_group.add_argument('--kernel-sizes', type=int, default=[], nargs='+', metavar='K',
+                               help='kernel sizes of CNN layers in CNN state encoder (defaults: 3)')
+cnn_encoder_group.add_argument('--strides', type=int, default=[], nargs='+', metavar='S',
+                               help='strides of CNN layers in CNN state encoder (defaults: 1)')
+cnn_encoder_group.add_argument('--paddings', type=int, default=[], nargs='+', metavar='P',
+                               help='paddings of CNN layers in CNN state encoder (defaults: K // 2)')
+cnn_encoder_group.add_argument('--batch-normalization', action='store_true', default=False,
+                               help='use batch normalization in CNN state encoder')
 parser.add_argument('--max-episode-steps', type=int, default=10000,
                     help='max steps per episode (default: 10000)')
 parser.add_argument('--n-epochs', type=int, default=1000,
@@ -138,7 +154,11 @@ else:
 ENV_NAME = args.env
 ENV = gym.make(ENV_NAME)
 ENV.seed(RANDOM_SEED)
-ENV = FlattenedObservation(NormalizedAction(FlattenedAction(ENV)))
+ENV = NormalizedAction(FlattenedAction(ENV))
+if args.vision_observation:
+    ENV = VisionObservation(ENV, image_size=(args.image_size, args.image_size))
+else:
+    ENV = FlattenedObservation(ENV)
 ACTION_DIM = ENV.action_space.shape[0]
 if args.n_frames > 1:
     ENV = ConcatenatedObservation(ENV, n_frames=args.n_frames, dim=0)
@@ -146,6 +166,7 @@ RENDER = args.render
 
 FC_ENCODER = (args.encoder_arch == 'FC')
 RNN_ENCODER = (args.encoder_arch == 'RNN')
+CNN_ENCODER = (args.encoder_arch == 'CNN')
 ENV_OBSERVATION_DIM = ENV.observation_space.shape[0]
 STATE_DIM = (args.state_dim or ENV_OBSERVATION_DIM)
 if FC_ENCODER:
@@ -159,7 +180,28 @@ elif RNN_ENCODER:
                                                   n_dims_lstm_hidden=args.encoder_hidden_dims_lstm,
                                                   n_dims_after_lstm=[*args.encoder_hidden_dims_after_lstm, STATE_DIM],
                                                   skip_connection=args.skip_connection,
-                                                  activation=ACTIVATION, output_activation=None)
+                                                  activation=ACTIVATION,
+                                                  output_activation=None)
+elif CNN_ENCODER:
+    N_HIDDEN_CHANNELS = args.encoder_hidden_channels
+    KERNEL_SIZES = args.kernel_sizes
+    STRIDES = args.strides
+    PADDINGS = args.paddings
+    while len(KERNEL_SIZES) < len(N_HIDDEN_CHANNELS):
+        KERNEL_SIZES.append(3)
+    while len(STRIDES) < len(KERNEL_SIZES):
+        STRIDES.append(1)
+    while len(PADDINGS) < len(KERNEL_SIZES):
+        PADDINGS.append(KERNEL_SIZES[len(PADDINGS)] // 2)
+    STATE_ENCODER = VanillaConvolutionalNetwork(input_channels=ENV.observation_space.shape[0],
+                                                output_dim=STATE_DIM,
+                                                n_hidden_channels=N_HIDDEN_CHANNELS,
+                                                kernel_sizes=KERNEL_SIZES,
+                                                strides=STRIDES,
+                                                paddings=PADDINGS,
+                                                batch_normalization=False,
+                                                activation=ACTIVATION,
+                                                output_activation=None)
 
 MAX_EPISODE_STEPS = args.max_episode_steps
 try:

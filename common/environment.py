@@ -2,12 +2,13 @@ from collections import deque
 
 import gym
 import numpy as np
+import torchvision.transforms as transforms
 from gym.spaces import Box
 
 
 __all__ = [
     'FlattenedAction', 'NormalizedAction',
-    'FlattenedObservation', 'ConcatenatedObservation'
+    'FlattenedObservation', 'VisionObservation', 'ConcatenatedObservation'
 ]
 
 try:
@@ -66,6 +67,25 @@ class FlattenedObservation(gym.ObservationWrapper):
 
     def observation(self, observation):
         return np.ravel(observation)
+
+
+class VisionObservation(gym.ObservationWrapper):
+    def __init__(self, env, image_size=(128, 128)):
+        super().__init__(env=env)
+        self.observation_space = Box(low=0.0, high=1.0, shape=(3, *image_size), dtype=np.float32)
+        self.image_size = image_size
+
+        self.transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize(size=image_size),
+            transforms.ToTensor()
+        ])
+
+    def observation(self, observation):
+        obs = self.render(mode='rgb_array')
+        obs = self.transform(obs)
+
+        return obs
 
 
 class ConcatenatedObservation(gym.ObservationWrapper):
