@@ -124,14 +124,14 @@ RNN state encoder:
 
 CNN state encoder:
   --encoder-hidden-channels CHN [CHN ...]
-                        hidden CNN channels in CNN state encoder
+                        channels of hidden conv layers in CNN state encoder
   --kernel-sizes K [K ...]
-                        kernel sizes of CNN layers in CNN state encoder
+                        kernel sizes of conv layers in CNN state encoder
                         (defaults: 3)
-  --strides S [S ...]   strides of CNN layers in CNN state encoder (defaults:
+  --strides S [S ...]   strides of conv layers in CNN state encoder (defaults:
                         1)
-  --paddings P [P ...]  paddings of CNN layers in CNN state encoder (defaults:
-                        K // 2)
+  --paddings P [P ...]  paddings of conv layers in CNN state encoder
+                        (defaults: K // 2)
   --batch-normalization
                         use batch normalization in CNN state encoder
 

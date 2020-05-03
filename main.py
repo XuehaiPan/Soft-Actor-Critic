@@ -74,13 +74,13 @@ rnn_encoder_group.add_argument('--step-size', type=int, default=16,
                                help='number of continuous steps for update (default: 16)')
 cnn_encoder_group = parser.add_argument_group('CNN state encoder')
 cnn_encoder_group.add_argument('--encoder-hidden-channels', type=int, default=[], nargs='+', metavar='CHN',
-                               help='hidden CNN channels in CNN state encoder')
+                               help='channels of hidden conv layers in CNN state encoder')
 cnn_encoder_group.add_argument('--kernel-sizes', type=int, default=[], nargs='+', metavar='K',
-                               help='kernel sizes of CNN layers in CNN state encoder (defaults: 3)')
+                               help='kernel sizes of conv layers in CNN state encoder (defaults: 3)')
 cnn_encoder_group.add_argument('--strides', type=int, default=[], nargs='+', metavar='S',
-                               help='strides of CNN layers in CNN state encoder (defaults: 1)')
+                               help='strides of conv layers in CNN state encoder (defaults: 1)')
 cnn_encoder_group.add_argument('--paddings', type=int, default=[], nargs='+', metavar='P',
-                               help='paddings of CNN layers in CNN state encoder (defaults: K // 2)')
+                               help='paddings of conv layers in CNN state encoder (defaults: K // 2)')
 cnn_encoder_group.add_argument('--batch-normalization', action='store_true', default=False,
                                help='use batch normalization in CNN state encoder')
 parser.add_argument('--max-episode-steps', type=int, default=10000,
