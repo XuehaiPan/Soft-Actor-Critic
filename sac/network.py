@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -46,6 +48,66 @@ class ActionScaler(NetworkBase):
 
     def forward(self, action):
         return self.scaler.forward(action)
+
+    def plot(self):
+        action_dim = self.action_dim
+
+        weight = self.scaler.weight.detach().cpu().numpy()
+        bias = self.scaler.bias.detach().cpu().numpy()
+        bias = np.expand_dims(bias, axis=1)
+
+        det = np.linalg.det(weight)
+        eigenvalues = sorted(np.linalg.eigvals(weight).real, reverse=True)
+        eigenvalues = f"[{', '.join([f'{val:.3f}' for val in eigenvalues])}]"
+
+        weight = np.concatenate([weight, np.zeros_like(bias), bias], axis=1)
+
+        vmax = np.abs(weight).max()
+
+        fig, ax = plt.subplots(figsize=(action_dim + 2, action_dim))
+
+        im = ax.imshow(weight, origin='upper', aspect='equal', vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+        fig.colorbar(im, ax=ax)
+        for (i, j), v in np.ndenumerate(weight):
+            if j != action_dim:
+                ax.text(j, i, s=f'{v:.2f}',
+                        horizontalalignment='center',
+                        verticalalignment='center')
+
+        for i in range(action_dim + 1):
+            alpha = 0.5
+            linestyle = ':'
+            if i == 0 or i == action_dim:
+                alpha = 1.0
+                linestyle = '-'
+            ax.axhline(i - 0.5, xmin=0.05 / (action_dim + 2.1), xmax=1.0 - 2.05 / (action_dim + 2.1),
+                       color='black', alpha=alpha, linestyle=linestyle, linewidth=1.0)
+            ax.axhline(i - 0.5, xmin=1.0 - 1.05 / (action_dim + 2.1), xmax=1.0 - 0.05 / (action_dim + 2.1),
+                       color='black', alpha=alpha, linestyle=linestyle, linewidth=1.0)
+            ax.axvline(i - 0.5, ymin=0.05 / (action_dim + 0.1), ymax=1.0 - 0.05 / (action_dim + 0.1),
+                       color='black', alpha=alpha, linestyle=linestyle, linewidth=1.0)
+        ax.add_artist(plt.Rectangle(xy=(action_dim - 0.5, -0.5), width=1, height=action_dim, color='white'))
+        ax.axvline(action_dim + 0.5, ymin=0.05 / (action_dim + 0.1), ymax=1.0 - 0.05 / (action_dim + 0.1),
+                   color='black', linestyle='-', linewidth=1.0)
+        ax.axvline(action_dim + 1.5, ymin=0.05 / (action_dim + 0.1), ymax=1.0 - 0.05 / (action_dim + 0.1),
+                   color='black', linestyle='-', linewidth=1.0)
+
+        ax.set_title(label=f'$\mathrm{{det}} (w) = {det:.5f}$\n'
+                           f'$\mathrm{{Re}} (\mathrm{{eigvals}} (w)) = {eigenvalues}$')
+        ax.tick_params(top=False, bottom=False, left=False, right=False)
+
+        ax.set_xlim(left=-0.55, right=action_dim + 1.55)
+        ax.set_ylim(top=-0.55, bottom=action_dim - 0.45)
+
+        ax.set_xticks(ticks=[(action_dim - 1) / 2, action_dim + 1])
+        ax.set_xticklabels(labels=['$w$', '$b$'])
+        ax.set_yticks(ticks=[])
+
+        for spline in ax.spines.values():
+            spline.set_visible(False)
+
+        fig.tight_layout()
+        return fig
 
     @property
     def action_scale(self):

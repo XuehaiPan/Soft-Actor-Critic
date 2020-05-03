@@ -7,6 +7,7 @@ import time
 from collections import OrderedDict
 
 import gym
+import matplotlib as mpl
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -19,6 +20,8 @@ from common.environment import FlattenedAction, NormalizedAction, \
     FlattenedObservation, ConcatenatedObservation
 from common.network_base import VanillaNeuralNetwork
 
+
+mpl.use('Agg')
 
 try:
     mp.set_start_method('spawn', force=True)
@@ -332,6 +335,13 @@ def main():
                 train_writer.add_scalar(tag='epoch/soft_q_loss', scalar_value=epoch_soft_q_loss, global_step=epoch)
                 train_writer.add_scalar(tag='epoch/policy_loss', scalar_value=epoch_policy_loss, global_step=epoch)
                 train_writer.add_scalar(tag='epoch/temperature_parameter', scalar_value=epoch_alpha, global_step=epoch)
+
+                train_writer.add_figure(tag='epoch/action_scaler_1',
+                                        figure=model.soft_q_net_1.action_scaler.plot(),
+                                        global_step=epoch)
+                train_writer.add_figure(tag='epoch/action_scaler_2',
+                                        figure=model.soft_q_net_2.action_scaler.plot(),
+                                        global_step=epoch)
 
                 train_writer.flush()
                 if epoch % 10 == 0:
