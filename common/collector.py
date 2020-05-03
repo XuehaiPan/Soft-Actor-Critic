@@ -188,7 +188,7 @@ class TrajectorySampler(Sampler):
                 if self.random_sample:
                     action = self.env.action_space.sample()
                 else:
-                    state = state_encoder.encode(observation, hidden=hidden)
+                    state, hidden = state_encoder.encode(observation, hidden=hidden)
                     action = policy_net.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
