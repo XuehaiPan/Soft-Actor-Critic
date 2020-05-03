@@ -4,5 +4,6 @@ pytorch
 torchvision
 tensorboard
 gym
+pybullet
 pillow
 moviepy
