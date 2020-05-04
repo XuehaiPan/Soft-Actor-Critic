@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.multiprocessing as mp
 
-from common.network_base import LSTMHidden
+from common.network_base import cat_hidden
 
 
 __all__ = ['ReplayBuffer', 'TrajectoryReplayBuffer']
@@ -86,19 +86,17 @@ class TrajectoryReplayBuffer(ReplayBuffer):
     def sample(self, batch_size, step_size):
         batch = []
         hiddens = []
-        lengths = np.asanyarray(self.lengths)
+        with self.lock:
+            lengths = np.asanyarray(self.lengths)
         weights = lengths / lengths.sum()
         for i in range(batch_size):
             while True:
                 index = np.random.choice(len(weights), p=weights)
-                observation, action, reward, next_observation, done, hidden = self.buffer[index]
-                if len(observation) >= step_size:
-                    offset = random.randint(0, len(observation) - step_size)
-                    batch.append((observation[offset:offset + step_size],
-                                  action[offset:offset + step_size],
-                                  reward[offset:offset + step_size],
-                                  next_observation[offset:offset + step_size],
-                                  done[offset:offset + step_size]))
+                *items, hidden = self.buffer[index]
+                length = len(items[0])
+                if length >= step_size:
+                    offset = random.randint(0, length - step_size)
+                    batch.append([item[offset:offset + step_size] for item in items])
                     hiddens.append(hidden[offset].unsqueeze(dim=0))
                     break
 
@@ -108,7 +106,7 @@ class TrajectoryReplayBuffer(ReplayBuffer):
 
         # size: (seq_len, batch_size, item_size)
         observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.transpose(0, 1), batch))
-        hidden = LSTMHidden.cat(hiddens=hiddens, dim=1)
+        hidden = cat_hidden(hiddens=hiddens, dim=1)
         return observation, action, reward, next_observation, done, hidden
 
     @property
