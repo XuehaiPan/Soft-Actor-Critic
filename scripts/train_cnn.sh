@@ -35,5 +35,6 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--gamma 0.99 --soft-tau 0.01 \
 	--normalize-rewards --reward-scale 1.0 \
 	--weight-decay 1E-5 --random-seed 0 \
+	--log-episode-video \
 	--log-dir "$LOG_DIR" \
 	--checkpoint-dir "$CHECKPOINT_DIR"

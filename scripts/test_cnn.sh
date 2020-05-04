@@ -28,6 +28,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \
+	--log-episode-video \
 	--log-dir "$LOG_DIR" \
 	--checkpoint-dir "$CHECKPOINT_DIR" \
 	--load-checkpoint

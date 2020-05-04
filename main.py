@@ -126,6 +126,8 @@ parser.add_argument('--weight-decay', type=float, default=0.0,
                     help='weight decay (default: 0.0)')
 parser.add_argument('--random-seed', type=int, default=0, metavar='SEED',
                     help='random seed (default: 0)')
+parser.add_argument('--log-episode-video', action='store_true',
+                    help='save rendered episode videos to TensorBoard logs')
 parser.add_argument('--log-dir', type=str, default=os.path.join(ROOT_DIR, 'logs'),
                     help='folder to save TensorBoard logs')
 parser.add_argument('--checkpoint-dir', type=str, default=os.path.join(ROOT_DIR, 'checkpoints'),
@@ -245,6 +247,7 @@ if args.gpu is not None and torch.cuda.is_available():
 else:
     DEVICES = [torch.device('cpu')]
 
+LOG_EPISODE_VIDEO = args.log_episode_video
 LOG_DIR = args.log_dir
 CHECKPOINT_DIR = args.checkpoint_dir
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -322,6 +325,7 @@ def main():
                                       deterministic=False,
                                       random_sample=False,
                                       render=RENDER,
+                                      log_episode_video=LOG_EPISODE_VIDEO,
                                       log_dir=LOG_DIR)
 
         try:
@@ -408,6 +412,7 @@ def main():
                      deterministic=DETERMINISTIC,
                      random_sample=False,
                      render=RENDER,
+                     log_episode_video=LOG_EPISODE_VIDEO,
                      log_dir=LOG_DIR)
         episode_steps = np.asanyarray(model.collector.episode_steps)
         episode_rewards = np.asanyarray(model.collector.episode_rewards)

@@ -78,15 +78,15 @@ class ModelBase(object):
         return self.collector.replay_buffer
 
     def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
-               render=False, log_dir=None):
+               render=False, log_episode_video=False, log_dir=None):
         self.collector.sample(n_episodes, max_episode_steps, deterministic, random_sample,
-                              render, log_dir)
+                              render, log_episode_video, log_dir)
 
     def async_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
-                     render=False, log_dir=None):
+                     render=False, log_episode_video=False, log_dir=None):
         samplers = self.collector.async_sample(n_episodes, max_episode_steps,
                                                deterministic, random_sample,
-                                               render, log_dir)
+                                               render, log_episode_video, log_dir)
         return samplers
 
     def train(self, mode=True):

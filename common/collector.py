@@ -24,7 +24,7 @@ class Sampler(mp.Process):
                  eval_only, replay_buffer,
                  n_total_steps, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
-                 deterministic, random_sample, render,
+                 deterministic, random_sample, render, log_episode_video,
                  device, random_seed, log_dir):
         super().__init__(name=f'sampler_{rank}')
 
@@ -57,6 +57,7 @@ class Sampler(mp.Process):
         self.deterministic = deterministic
         self.random_sample = random_sample
         self.render_env = (render and rank == 0)
+        self.log_episode_video = (log_episode_video and rank == 0)
 
         self.log_dir = log_dir
 
@@ -134,14 +135,14 @@ class Sampler(mp.Process):
                 pass
 
     def save_frame(self):
-        if not self.random_sample and self.rank == 0 and self.episode % 100 == 0:
+        if not self.random_sample and self.log_episode_video and self.episode % 100 == 0:
             try:
                 self.frames.append(self.env.render(mode='rgb_array'))
             except Exception:
                 pass
 
     def log_video(self):
-        if self.writer is not None and self.rank == 0 and self.episode % 100 == 0:
+        if self.writer is not None and self.log_episode_video and self.episode % 100 == 0:
             try:
                 video = np.stack(self.frames).transpose((0, 3, 1, 2))
                 video = np.expand_dims(video, axis=0)
@@ -258,7 +259,7 @@ class CollectorBase(object):
         return self.total_steps.value
 
     def async_sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
-                     render=False, log_dir=None):
+                     render=False, log_episode_video=False, log_dir=None):
         self.resume()
 
         events = [self.manager.Event() for i in range(self.n_samplers)]
@@ -274,7 +275,7 @@ class CollectorBase(object):
                                    self.eval_only, self.replay_buffer,
                                    self.total_steps, self.episode_steps, self.episode_rewards,
                                    n_episodes, max_episode_steps,
-                                   deterministic, random_sample, render,
+                                   deterministic, random_sample, render, log_episode_video,
                                    self.devices[rank], self.random_seed + rank, log_dir)
             sampler.start()
             samplers.append(sampler)
@@ -282,11 +283,11 @@ class CollectorBase(object):
         return samplers
 
     def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
-               render=False, log_dir=None):
+               render=False, log_episode_video=False, log_dir=None):
         n_initial_episodes = self.n_episodes
 
         samplers = self.async_sample(n_episodes, max_episode_steps, deterministic, random_sample,
-                                     render, log_dir)
+                                     render, log_episode_video, log_dir)
 
         pbar = tqdm.tqdm(total=n_episodes, desc='Sampling')
         while True:
