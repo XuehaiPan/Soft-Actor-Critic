@@ -40,13 +40,6 @@ class Trainer(TrainerBase):
                                adaptive_entropy, target_entropy,
                                gamma, soft_tau, epsilon)
 
-    def load_model(self, path):
-        super().load_model(path=path)
-        self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
-        self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
-        self.target_soft_q_net_1.eval()
-        self.target_soft_q_net_2.eval()
-
 
 class Tester(ModelBase):
     def __init__(self, *args, **kwargs):
