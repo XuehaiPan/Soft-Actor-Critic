@@ -12,6 +12,10 @@ cd Soft-Actor-Critic
 pip3 install -r requirements.txt
 
 # modify hyperparameters before running
+# train/test FC controller without state encoder
+bash scripts/train_identity.sh
+bash scripts/test_identity.sh
+
 # train/test FC controller with FC state encoder
 bash scripts/train_fc.sh
 bash scripts/test_fc.sh
