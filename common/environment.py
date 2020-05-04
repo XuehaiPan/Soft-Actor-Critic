@@ -81,7 +81,12 @@ class VisionObservation(gym.ObservationWrapper):
             transforms.ToTensor()
         ])
 
+        self.unwrapped_observation_space = self.env.observation_space
+        self.unwrapped_observation = None
+
     def observation(self, observation):
+        self.unwrapped_observation = observation
+
         obs = self.render(mode='rgb_array')
         obs = self.transform(obs)
 
