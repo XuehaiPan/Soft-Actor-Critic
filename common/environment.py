@@ -88,7 +88,7 @@ class VisionObservation(gym.ObservationWrapper):
         self.unwrapped_observation = observation
 
         obs = self.render(mode='rgb_array')
-        obs = self.transform(obs)
+        obs = self.transform(obs).cpu().detach().numpy()
 
         return obs
 
