@@ -1,6 +1,26 @@
 # Soft-Actor-Critic
 PyTorch Implementation of Soft Actor-Critic Algorithm
 
+Reference: Soft Actor-Critic Algorithms and Applications ([https://arxiv.org/pdf/1812.05905.pdf](https://arxiv.org/pdf/1812.05905.pdf))
+
+# Main Features
+
+- fully customizable network structure
+- parallel data sampling
+- comprehensive logging
+- good performance
+
+# Requirements
+
+- [PyTorch](https://pytorch.org/)
+- [TensorBoard](https://www.tensorflow.org/tensorboard/)
+- [Gym](http://gym.openai.com/)
+- [PyBullet](https://pybullet.org/wordpress/)
+
+# Architecture
+
+![architecture](images/architecture.png)
+
 # Usage
 
 ```bash
