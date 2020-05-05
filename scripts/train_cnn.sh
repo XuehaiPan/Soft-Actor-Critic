@@ -17,6 +17,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--mode train --gpu 0 1 2 3 4 \
 	--env "$ENV" \
 	--vision-observation --image-size 128 \
+	--n-frames 3 \
 	--hidden-dims 128 64 \
 	--activation LeakyReLU \
 	--encoder-arch CNN \
