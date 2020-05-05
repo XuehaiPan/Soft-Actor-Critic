@@ -1,6 +1,5 @@
 import torch
 
-from common.network_base import LSTMHidden
 from sac.network import StateEncoderWrapper as OriginalStateEncoderWrapper
 
 
@@ -18,5 +17,4 @@ class StateEncoderWrapper(OriginalStateEncoderWrapper):
         return encoded, hidden
 
     def initial_hiddens(self, batch_size=1):
-        init_hidden = LSTMHidden(hidden=list(zip(self.encoder.init_hiddens, self.encoder.init_cells)))
-        return init_hidden.repeat(1, batch_size, 1)
+        return self.encoder.initial_hiddens(batch_size=batch_size)
