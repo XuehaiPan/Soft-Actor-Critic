@@ -26,9 +26,9 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--strides 1 1 1 \
 	--paddings 1 1 1 \
 	--max-episode-steps 500 \
-	--n-epochs 1000 --n-updates 256 --batch-size 256 \
+	--n-epochs 1000 --n-updates 256 --batch-size 128 \
 	--n-samplers 4 \
-	--buffer-capacity 1000000 \
+	--buffer-capacity 100000 \
 	--update-sample-ratio 2.0 \
 	--soft-q-lr 1E-3 --policy-lr 1E-4 \
 	--alpha-lr 1E-3 --initial-alpha 1.0 --adaptive-entropy \
