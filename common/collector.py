@@ -232,7 +232,7 @@ class CollectorBase(object):
         self.manager = mp.Manager()
         self.running_event = self.manager.Event()
         self.running_event.set()
-        self.total_steps = self.manager.Value('L', value=0)
+        self.total_steps = self.manager.Value('L', 0)
         self.episode_steps = self.manager.list()
         self.episode_rewards = self.manager.list()
         self.lock = self.manager.Lock()

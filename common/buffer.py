@@ -14,7 +14,7 @@ class ReplayBuffer(object):
     def __init__(self, capacity, initializer, Value=mp.Value, Lock=mp.Lock):
         self.capacity = capacity
         self.buffer = initializer()
-        self.buffer_offset = Value('L', value=0)
+        self.buffer_offset = Value('L', 0)
         self.lock = Lock()
 
     def push(self, *args):
@@ -24,8 +24,7 @@ class ReplayBuffer(object):
                 self.buffer.append(items)
             else:
                 self.buffer[self.offset] = items
-            self.offset += 1
-            self.offset %= self.capacity
+            self.offset = (self.offset + 1) % self.capacity
 
     def extend(self, trajectory):
         with self.lock:
@@ -34,8 +33,7 @@ class ReplayBuffer(object):
                     self.buffer.append(items)
                 else:
                     self.buffer[self.offset] = items
-                self.offset += 1
-                self.offset %= self.capacity
+                self.offset = (self.offset + 1) % self.capacity
 
     def sample(self, batch_size):
         batch = []
@@ -66,7 +64,7 @@ class TrajectoryReplayBuffer(ReplayBuffer):
     def __init__(self, capacity, initializer, Value=mp.Value, Lock=mp.Lock()):
         super().__init__(capacity=capacity, initializer=initializer, Value=Value, Lock=Lock)
         self.lengths = initializer()
-        self.buffer_size = Value('L', value=0)
+        self.buffer_size = Value('L', 0)
 
     def push(self, *args):
         items = tuple(args)
