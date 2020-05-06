@@ -90,8 +90,9 @@ class ModelBase(object):
         return samplers
 
     def train(self, mode=True):
-        self.training = mode
-        self.modules.train(mode=mode)
+        if self.training != mode:
+            self.training = mode
+            self.modules.train(mode=mode)
         self.collector.train(mode=mode)
         return self
 
