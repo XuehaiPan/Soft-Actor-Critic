@@ -7,6 +7,7 @@ from functools import lru_cache
 import numpy as np
 import torch.multiprocessing as mp
 import tqdm
+from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
 from common.buffer import ReplayBuffer, TrajectoryReplayBuffer
@@ -66,6 +67,8 @@ class Sampler(mp.Process):
         self.render()
 
     def run(self):
+        setproctitle(title=self.name)
+
         if not self.random_sample:
             state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
             policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
@@ -161,6 +164,8 @@ class Sampler(mp.Process):
 
 class TrajectorySampler(Sampler):
     def run(self):
+        setproctitle(title=self.name)
+
         state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
         policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
         state_encoder.eval()

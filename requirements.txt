@@ -7,3 +7,4 @@ gym
 pybullet
 pillow
 moviepy
+setproctitle

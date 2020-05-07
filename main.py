@@ -17,6 +17,7 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.nn.functional as F
 import tqdm
+from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
 from common.environment import FlattenedAction, NormalizedAction, \
@@ -334,6 +335,7 @@ def main():
             while model.collector.n_total_steps == n_initial_samples:
                 time.sleep(0.1)
 
+            setproctitle(title='trainer')
             for epoch in range(INITIAL_EPOCH + 1, N_EPOCHS + 1):
                 epoch_soft_q_loss = 0.0
                 epoch_policy_loss = 0.0
