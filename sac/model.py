@@ -177,9 +177,12 @@ class TrainerBase(ModelBase):
         # Train policy function
         predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action),
                                           self.soft_q_net_2(state, new_action))
+        predicted_new_q_value_soft_q_grad_only = torch.min(self.soft_q_net_1(state, new_action.detach()),
+                                                           self.soft_q_net_2(state, new_action.detach()))
         policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
+        policy_loss_unbiased = policy_loss + predicted_new_q_value_soft_q_grad_only.mean()
 
-        loss = soft_q_loss + self.policy_loss_weight * policy_loss
+        loss = soft_q_loss + self.policy_loss_weight * policy_loss_unbiased
         self.optimizer.zero_grad()
         loss.backward()
         for param_group in self.optimizer.param_groups:
