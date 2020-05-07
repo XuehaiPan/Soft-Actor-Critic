@@ -16,6 +16,11 @@ try:
 except ImportError:
     pass
 
+try:
+    import mujoco_py
+except ImportError:
+    pass
+
 
 class FlattenedAction(gym.ActionWrapper):
     def __init__(self, env):
