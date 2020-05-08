@@ -35,8 +35,10 @@ class Sampler(mp.Process):
         self.next_sampler_event = next_sampler_event
         self.timeout = 60.0 * n_samplers
 
-        self.env = env_func(**env_kwargs)
-        self.env.seed(random_seed)
+        self.env = None
+        self.env_func = env_func
+        self.env_kwargs = env_kwargs
+        self.random_seed = random_seed
 
         self.shared_state_encoder = state_encoder
         self.shared_policy_net = policy_net
@@ -68,6 +70,9 @@ class Sampler(mp.Process):
 
     def run(self):
         setproctitle(title=self.name)
+
+        self.env = self.env_func(**self.env_kwargs)
+        self.env.seed(self.random_seed)
 
         if not self.random_sample:
             state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
@@ -165,6 +170,9 @@ class Sampler(mp.Process):
 class TrajectorySampler(Sampler):
     def run(self):
         setproctitle(title=self.name)
+
+        self.env = self.env_func(**self.env_kwargs)
+        self.env.seed(self.random_seed)
 
         state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
         policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
