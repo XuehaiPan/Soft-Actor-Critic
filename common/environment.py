@@ -19,7 +19,7 @@ except ImportError:
 
 try:
     import mujoco_py
-except ImportError:
+except Exception:
     pass
 
 
