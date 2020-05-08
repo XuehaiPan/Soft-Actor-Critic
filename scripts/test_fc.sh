@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ENV="Pendulum-v0"
-LOG_DIR="logs/$ENV/FC"
+DATETIME="$(date +"%Y-%m-%d-%T")"
+LOG_DIR="logs/$ENV/FC/$DATETIME"
 CHECKPOINT_DIR="checkpoints/$ENV/FC"
 
 ROOT_DIR="$(

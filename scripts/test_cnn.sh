@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ENV="InvertedPendulumBulletEnv-v0"
-LOG_DIR="logs/$ENV/CNN"
+DATETIME="$(date +"%Y-%m-%d-%T")"
+LOG_DIR="logs/$ENV/CNN/$DATETIME"
 CHECKPOINT_DIR="checkpoints/$ENV/CNN"
 
 ROOT_DIR="$(

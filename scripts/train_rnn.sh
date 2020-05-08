@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ENV="Pendulum-v0"
-LOG_DIR="logs/$ENV/RNN"
+DATETIME="$(date +"%Y-%m-%d-%T")"
+LOG_DIR="logs/$ENV/RNN/$DATETIME"
 CHECKPOINT_DIR="checkpoints/$ENV/RNN"
 
 ROOT_DIR="$(
