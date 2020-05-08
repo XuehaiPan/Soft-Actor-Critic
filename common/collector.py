@@ -33,6 +33,7 @@ class Sampler(mp.Process):
         self.running_event = running_event
         self.event = event
         self.next_sampler_event = next_sampler_event
+        self.timeout = 60.0 * n_samplers
 
         self.env = env_func(**env_kwargs)
         self.env.seed(random_seed)
@@ -110,7 +111,7 @@ class Sampler(mp.Process):
                     break
 
             self.running_event.wait()
-            self.event.wait()
+            self.event.wait(timeout=self.timeout)
             with self.lock:
                 self.replay_buffer.extend(trajectory)
                 self.n_total_steps.value += episode_steps
@@ -210,7 +211,7 @@ class TrajectorySampler(Sampler):
             hiddens = cat_hidden(hiddens, dim=0).detach().cpu()
 
             self.running_event.wait()
-            self.event.wait()
+            self.event.wait(timeout=self.timeout)
             with self.lock:
                 self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))), hiddens)
                 self.n_total_steps.value += episode_steps
