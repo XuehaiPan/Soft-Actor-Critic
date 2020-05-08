@@ -118,7 +118,7 @@ class LSTMHidden(object):
             def func(*args, **kwargs):
                 new_hidden = []
                 for h, c in self_hidden:
-                    new_hidden.append((getattr(h, item)(*args, **kwargs), getattr(c, item)(*args, **kwargs)))
+                    new_hidden.append((attr(h, *args, **kwargs), attr(c, *args, **kwargs)))
                 return LSTMHidden(hidden=new_hidden)
 
             return func
@@ -127,6 +127,12 @@ class LSTMHidden(object):
             for h, c in self.hidden:
                 new_hidden.append((getattr(h, item), getattr(c, item)))
             return LSTMHidden(hidden=new_hidden)
+
+    def float(self):
+        new_hidden = []
+        for h, c in self.hidden:
+            new_hidden.append((torch.FloatTensor(h), torch.FloatTensor(c)))
+        return LSTMHidden(hidden=new_hidden)
 
     @staticmethod
     def cat(hiddens, dim=0):

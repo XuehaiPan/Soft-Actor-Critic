@@ -208,7 +208,7 @@ class TrajectorySampler(Sampler):
                 if done:
                     break
 
-            hiddens = cat_hidden(hiddens, dim=0).detach().cpu()
+            hiddens = cat_hidden(hiddens, dim=0).cpu().detach().numpy()
 
             self.running_event.wait()
             self.event.wait(timeout=self.timeout)

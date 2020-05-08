@@ -95,7 +95,7 @@ class TrajectoryReplayBuffer(ReplayBuffer):
                 if length >= step_size:
                     offset = random.randint(0, length - step_size)
                     batch.append([item[offset:offset + step_size] for item in items])
-                    hiddens.append(hidden[offset].unsqueeze(dim=0))
+                    hiddens.append(hidden[offset].float().unsqueeze(dim=0))
                     break
 
         # size: (batch_size, seq_len, item_size)
