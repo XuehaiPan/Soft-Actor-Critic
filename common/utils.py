@@ -6,6 +6,9 @@ import re
 import torch
 
 
+CHECKPOINT_REGEX = re.compile(r'^(.*/)?[\w-]*-(?P<epoch>\d+)-(?P<reward>[\-+Ee\d.]+)\.pkl$')
+
+
 def clone_network(src_net, device=None):
     if device is None and hasattr(src_net, 'device'):
         device = src_net.device
@@ -44,19 +47,25 @@ def check_devices(config):
     return devices
 
 
+def get_checkpoint(checkpoint_dir, by='epoch'):
+    try:
+        return max(glob.iglob(os.path.join(checkpoint_dir, '*.pkl')),
+                   key=lambda path: float(CHECKPOINT_REGEX.search(path).group(by)),
+                   default=None)
+    except AttributeError:
+        return None
+
+
 def check_logging(config):
     os.makedirs(config.log_dir, exist_ok=True)
     os.makedirs(config.checkpoint_dir, exist_ok=True)
 
-    checkpoint_regex = re.compile(r'^(.*/)?[\w-]*-(?P<epoch>\d+)\.pkl$')
     if config.mode == 'test' or config.load_checkpoint:
-        initial_checkpoint = max(glob.iglob(os.path.join(config.checkpoint_dir, '*.pkl')),
-                                 key=lambda path: int(checkpoint_regex.search(path).group('epoch')),
-                                 default=None)
+        initial_checkpoint = get_checkpoint(config.checkpoint_dir, by='epoch')
     else:
         initial_checkpoint = None
     if initial_checkpoint is not None:
-        initial_epoch = int(checkpoint_regex.search(initial_checkpoint).group('epoch'))
+        initial_epoch = int(CHECKPOINT_REGEX.search(initial_checkpoint).group('epoch'))
     else:
         initial_epoch = 0
 
