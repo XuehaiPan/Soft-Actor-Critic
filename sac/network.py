@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from common.network_base import NetworkBase, VanillaNeuralNetwork
+from common.network_base import NetworkBase, MultilayerPerceptron
 
 
 __all__ = ['StateEncoderWrapper', 'ActionScaler', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork']
@@ -115,7 +115,7 @@ class ActionScaler(NetworkBase):
             return self.scaler.weight.det().item()
 
 
-class ValueNetwork(VanillaNeuralNetwork):
+class ValueNetwork(MultilayerPerceptron):
     def __init__(self, state_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU):
         super().__init__(n_dims=[state_dim, *hidden_dims, 1],
                          activation=activation,
@@ -128,7 +128,7 @@ class ValueNetwork(VanillaNeuralNetwork):
         return super().forward(state)
 
 
-class SoftQNetwork(VanillaNeuralNetwork):
+class SoftQNetwork(MultilayerPerceptron):
     def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU):
         super().__init__(n_dims=[state_dim + action_dim, *hidden_dims, 1],
                          activation=activation,
@@ -148,7 +148,7 @@ class SoftQNetwork(VanillaNeuralNetwork):
         return self.action_scaler.action_scale
 
 
-class PolicyNetwork(VanillaNeuralNetwork):
+class PolicyNetwork(MultilayerPerceptron):
     def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU,
                  log_std_min=-20, log_std_max=2):
         super().__init__(n_dims=[state_dim, *hidden_dims, 2 * action_dim],

@@ -8,9 +8,10 @@ __all__ = [
     'build_encoder',
     'NetworkBase',
     'VanillaNeuralNetwork', 'VanillaNN',
+    'MultilayerPerceptron', 'MLP',
     'LSTMHidden', 'cat_hidden',
-    'VanillaRecurrentNeuralNetwork', 'VanillaRNN',
-    'VanillaConvolutionalNetwork', 'VanillaCNN'
+    'RecurrentNeuralNetwork', 'RNN',
+    'ConvolutionalNeuralNetwork', 'CNN'
 ]
 
 DEVICE_CPU = torch.device('cpu')
@@ -27,14 +28,14 @@ def build_encoder(config):
                                                  activation=config.activation,
                                                  output_activation=None)
     elif config.RNN_encoder:
-        state_encoder = VanillaRecurrentNeuralNetwork(n_dims_before_lstm=[config.observation_dim,
-                                                                          *config.encoder_hidden_dims_before_lstm],
-                                                      n_dims_lstm_hidden=config.encoder_hidden_dims_lstm,
-                                                      n_dims_after_lstm=[*config.encoder_hidden_dims_after_lstm,
-                                                                         config.state_dim],
-                                                      skip_connection=config.skip_connection,
-                                                      activation=config.activation,
-                                                      output_activation=None)
+        state_encoder = RecurrentNeuralNetwork(n_dims_before_lstm=[config.observation_dim,
+                                                                   *config.encoder_hidden_dims_before_lstm],
+                                               n_dims_lstm_hidden=config.encoder_hidden_dims_lstm,
+                                               n_dims_after_lstm=[*config.encoder_hidden_dims_after_lstm,
+                                                                  config.state_dim],
+                                               skip_connection=config.skip_connection,
+                                               activation=config.activation,
+                                               output_activation=None)
     elif config.CNN_encoder:
         n_hidden_channels = config.encoder_hidden_channels
         kernel_sizes = config.kernel_sizes
@@ -46,15 +47,15 @@ def build_encoder(config):
             strides.append(1)
         while len(paddings) < len(kernel_sizes):
             paddings.append(kernel_sizes[len(paddings)] // 2)
-        state_encoder = VanillaConvolutionalNetwork(input_channels=config.observation_dim,
-                                                    output_dim=config.state_dim,
-                                                    n_hidden_channels=n_hidden_channels,
-                                                    batch_normalization=False,
-                                                    output_activation=None,
-                                                    **config.build_from_keys(['kernel_sizes',
-                                                                              'strides',
-                                                                              'paddings',
-                                                                              'activation']))
+        state_encoder = ConvolutionalNeuralNetwork(input_channels=config.observation_dim,
+                                                   output_dim=config.state_dim,
+                                                   n_hidden_channels=n_hidden_channels,
+                                                   batch_normalization=False,
+                                                   output_activation=None,
+                                                   **config.build_from_keys(['kernel_sizes',
+                                                                             'strides',
+                                                                             'paddings',
+                                                                             'activation']))
 
     config.state_encoder = state_encoder
     config.state_dim = state_dim
@@ -151,7 +152,7 @@ class LSTMHidden(object):
 cat_hidden = LSTMHidden.cat
 
 
-class VanillaRecurrentNeuralNetwork(NetworkBase):
+class RecurrentNeuralNetwork(NetworkBase):
     def __init__(self, n_dims_before_lstm, n_dims_lstm_hidden, n_dims_after_lstm,
                  skip_connection, trainable_initial_hidden=True, activation=F.relu,
                  output_activation=None, device=DEVICE_CPU):
@@ -227,7 +228,7 @@ class VanillaRecurrentNeuralNetwork(NetworkBase):
         return init_hidden.repeat(1, batch_size, 1)
 
 
-class VanillaConvolutionalNetwork(NetworkBase):
+class ConvolutionalNeuralNetwork(NetworkBase):
     def __init__(self, input_channels, output_dim,
                  n_hidden_channels, kernel_sizes, strides, paddings,
                  batch_normalization, activation=F.relu,
@@ -288,6 +289,6 @@ class VanillaConvolutionalNetwork(NetworkBase):
         return x
 
 
-VanillaNN = VanillaNeuralNetwork
-VanillaRNN = VanillaRecurrentNeuralNetwork
-VanillaCNN = VanillaConvolutionalNetwork
+MLP = MultilayerPerceptron = VanillaNN = VanillaNeuralNetwork
+RNN = RecurrentNeuralNetwork
+CNN = ConvolutionalNeuralNetwork
