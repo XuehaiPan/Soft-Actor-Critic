@@ -132,8 +132,21 @@ class Sampler(mp.Process):
                 self.log_video()
                 self.writer.flush()
 
+        self.env.close()
+
         if self.writer is not None:
             self.writer.close()
+
+    def close(self):
+        try:
+            self.env.close()
+        except Exception:
+            pass
+        try:
+            self.writer.close()
+        except Exception:
+            pass
+        super().close()
 
     def render(self, mode='human', **kwargs):
         if self.render_env:
@@ -235,6 +248,8 @@ class TrajectorySampler(Sampler):
                 self.log_video()
                 self.writer.flush()
 
+        self.env.close()
+
         if self.writer is not None:
             self.writer.close()
 
@@ -317,6 +332,7 @@ class CollectorBase(object):
 
         for sampler in samplers:
             sampler.join()
+            sampler.close()
 
     def pause(self):
         self.running_event.clear()

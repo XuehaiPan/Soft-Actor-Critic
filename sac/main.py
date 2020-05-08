@@ -108,6 +108,7 @@ def train(model, config):
             if sampler.is_alive():
                 sampler.terminate()
             sampler.join()
+            sampler.close()
 
 
 def test(model, config):
