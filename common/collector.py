@@ -10,7 +10,7 @@ from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
 from common.buffer import ReplayBuffer, TrajectoryReplayBuffer
-from common.network_base import cat_hidden
+from common.network import cat_hidden
 from common.utils import clone_network, sync_params
 
 

@@ -13,10 +13,9 @@ import torch.nn.functional as F
 
 from common.config import Config
 from common.environment import initialize_environment
-from common.network_base import build_encoder
+from common.network import build_encoder
 from common.utils import check_devices, check_logging
-from sac.main import train, test
-from sac.model import build_model
+from sac import build_model, train, test
 
 
 mpl.use('Agg')
@@ -158,6 +157,17 @@ def initialize_hyperparameters(config):
     config.FC_encoder = (config.encoder_arch == 'FC')
     config.RNN_encoder = (config.encoder_arch == 'RNN')
     config.CNN_encoder = (config.encoder_arch == 'CNN')
+
+    if config.CNN_encoder:
+        kernel_sizes = config.kernel_sizes
+        strides = config.strides
+        paddings = config.paddings
+        while len(kernel_sizes) < len(config.encoder_hidden_channels):
+            kernel_sizes.append(3)
+        while len(strides) < len(kernel_sizes):
+            strides.append(1)
+        while len(paddings) < len(kernel_sizes):
+            paddings.append(kernel_sizes[len(paddings)] // 2)
 
     config.n_samples_per_update = config.batch_size
     if config.RNN_encoder:

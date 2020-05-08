@@ -37,19 +37,9 @@ def build_encoder(config):
                                                activation=config.activation,
                                                output_activation=None)
     elif config.CNN_encoder:
-        n_hidden_channels = config.encoder_hidden_channels
-        kernel_sizes = config.kernel_sizes
-        strides = config.strides
-        paddings = config.paddings
-        while len(kernel_sizes) < len(n_hidden_channels):
-            kernel_sizes.append(3)
-        while len(strides) < len(kernel_sizes):
-            strides.append(1)
-        while len(paddings) < len(kernel_sizes):
-            paddings.append(kernel_sizes[len(paddings)] // 2)
         state_encoder = ConvolutionalNeuralNetwork(input_channels=config.observation_dim,
                                                    output_dim=config.state_dim,
-                                                   n_hidden_channels=n_hidden_channels,
+                                                   n_hidden_channels=config.encoder_hidden_channels,
                                                    batch_normalization=False,
                                                    output_activation=None,
                                                    **config.build_from_keys(['kernel_sizes',

@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from common.network_base import NetworkBase, MultilayerPerceptron
+from common.network import NetworkBase, MultilayerPerceptron
 
 
 __all__ = ['StateEncoderWrapper', 'ActionScaler', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork']

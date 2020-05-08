@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.multiprocessing as mp
 
-from common.network_base import cat_hidden
+from common.network import cat_hidden
 
 
 __all__ = ['ReplayBuffer', 'TrajectoryReplayBuffer']
