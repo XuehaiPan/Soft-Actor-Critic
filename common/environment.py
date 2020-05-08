@@ -7,6 +7,7 @@ from gym.spaces import Box
 
 
 __all__ = [
+    'initialize_environment', 'build_env',
     'FlattenedAction', 'NormalizedAction',
     'FlattenedObservation', 'VisionObservation', 'ConcatenatedObservation'
 ]
@@ -20,6 +21,36 @@ try:
     import mujoco_py
 except ImportError:
     pass
+
+
+def initialize_environment(config):
+    build_env(config)
+
+
+def build_env(config):
+    if not isinstance(config.env, gym.Env):
+        env = gym.make(config.env)
+        env.seed(config.random_seed)
+
+        env = NormalizedAction(FlattenedAction(env))
+        if config.vision_observation:
+            env = VisionObservation(env, image_size=(config.image_size, config.image_size))
+        else:
+            env = FlattenedObservation(env)
+        if config.n_frames > 1:
+            env = ConcatenatedObservation(env, n_frames=config.n_frames, dim=0)
+
+        config.env = env
+        config.observation_dim = env.observation_space.shape[0]
+        config.action_dim = env.action_space.shape[0]
+        try:
+            config.max_episode_steps = min(config.max_episode_steps, env.spec.max_episode_steps)
+        except AttributeError:
+            pass
+        except TypeError:
+            pass
+
+    return config.env
 
 
 class FlattenedAction(gym.ActionWrapper):

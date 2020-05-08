@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 
 __all__ = [
+    'build_encoder',
     'NetworkBase',
     'VanillaNeuralNetwork', 'VanillaNN',
     'LSTMHidden', 'cat_hidden',
@@ -13,6 +14,52 @@ __all__ = [
 ]
 
 DEVICE_CPU = torch.device('cpu')
+
+
+def build_encoder(config):
+    state_dim = (config.state_dim or config.observation_dim)
+    state_encoder = nn.Identity()
+    if config.FC_encoder:
+        if config.state_dim is not None or len(config.encoder_hidden_dims) > 0:
+            state_encoder = VanillaNeuralNetwork(n_dims=[config.observation_dim,
+                                                         *config.encoder_hidden_dims,
+                                                         config.state_dim],
+                                                 activation=config.activation,
+                                                 output_activation=None)
+    elif config.RNN_encoder:
+        state_encoder = VanillaRecurrentNeuralNetwork(n_dims_before_lstm=[config.observation_dim,
+                                                                          *config.encoder_hidden_dims_before_lstm],
+                                                      n_dims_lstm_hidden=config.encoder_hidden_dims_lstm,
+                                                      n_dims_after_lstm=[*config.encoder_hidden_dims_after_lstm,
+                                                                         config.state_dim],
+                                                      skip_connection=config.skip_connection,
+                                                      activation=config.activation,
+                                                      output_activation=None)
+    elif config.CNN_encoder:
+        n_hidden_channels = config.encoder_hidden_channels
+        kernel_sizes = config.kernel_sizes
+        strides = config.strides
+        paddings = config.paddings
+        while len(kernel_sizes) < len(n_hidden_channels):
+            kernel_sizes.append(3)
+        while len(strides) < len(kernel_sizes):
+            strides.append(1)
+        while len(paddings) < len(kernel_sizes):
+            paddings.append(kernel_sizes[len(paddings)] // 2)
+        state_encoder = VanillaConvolutionalNetwork(input_channels=config.observation_dim,
+                                                    output_dim=config.state_dim,
+                                                    n_hidden_channels=n_hidden_channels,
+                                                    batch_normalization=False,
+                                                    output_activation=None,
+                                                    **config.build_from_keys(['kernel_sizes',
+                                                                              'strides',
+                                                                              'paddings',
+                                                                              'activation']))
+
+    config.state_encoder = state_encoder
+    config.state_dim = state_dim
+
+    return state_encoder
 
 
 class NetworkBase(nn.Module):

@@ -8,5 +8,5 @@ class Config(dict):
         except KeyError as e:
             raise AttributeError(e)
 
-    def build_dict_from_keys(self, keys):
-        return {key: self[key] for key in keys}
+    def build_from_keys(self, keys):
+        return Config({key: self[key] for key in keys})

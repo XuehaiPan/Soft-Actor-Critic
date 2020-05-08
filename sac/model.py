@@ -10,7 +10,44 @@ from common.utils import clone_network, sync_params
 from sac.network import SoftQNetwork, PolicyNetwork, StateEncoderWrapper
 
 
-__all__ = ['ModelBase', 'TrainerBase', 'Trainer', 'Tester']
+__all__ = ['build_model', 'ModelBase', 'TrainerBase', 'Trainer', 'Tester']
+
+
+def build_model(config):
+    model_kwargs = config.build_from_keys(['env',
+                                           'state_encoder',
+                                           'state_dim',
+                                           'action_dim',
+                                           'hidden_dims',
+                                           'activation',
+                                           'initial_alpha',
+                                           'n_samplers',
+                                           'buffer_capacity',
+                                           'devices',
+                                           'random_seed'])
+    if config.mode == 'train':
+        model_kwargs.update(config.build_from_keys(['soft_q_lr',
+                                                    'policy_lr',
+                                                    'alpha_lr',
+                                                    'weight_decay']))
+
+        if not config.RNN_encoder:
+            Model = Trainer
+        else:
+            from sac.rnn.model import Trainer as Model
+    else:
+        if not config.RNN_encoder:
+            Model = Tester
+        else:
+            from sac.rnn.model import Tester as Model
+
+    model = Model(**model_kwargs)
+    model.print_info()
+
+    if config.initial_checkpoint is not None:
+        model.load_model(path=config.initial_checkpoint)
+
+    return model
 
 
 class ModelBase(object):
