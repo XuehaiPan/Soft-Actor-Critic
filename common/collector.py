@@ -1,4 +1,3 @@
-import copy
 import itertools
 import os
 import time
@@ -21,7 +20,7 @@ __all__ = ['Collector', 'TrajectoryCollector']
 class Sampler(mp.Process):
     def __init__(self, rank, n_samplers, lock,
                  running_event, event, next_sampler_event,
-                 env, state_encoder, policy_net,
+                 env_func, env_kwargs, state_encoder, policy_net,
                  eval_only, replay_buffer,
                  n_total_steps, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
@@ -35,7 +34,7 @@ class Sampler(mp.Process):
         self.event = event
         self.next_sampler_event = next_sampler_event
 
-        self.env = copy.deepcopy(env)
+        self.env = env_func(**env_kwargs)
         self.env.seed(random_seed)
 
         self.shared_state_encoder = state_encoder
@@ -232,8 +231,9 @@ class TrajectorySampler(Sampler):
 
 
 class CollectorBase(object):
-    def __init__(self, state_encoder, policy_net, sampler, replay_buffer,
-                 env, buffer_capacity, n_samplers, devices, random_seed):
+    def __init__(self, env_func, env_kwargs, state_encoder, policy_net,
+                 n_samplers, sampler, replay_buffer, buffer_capacity,
+                 devices, random_seed):
         self.manager = mp.Manager()
         self.running_event = self.manager.Event()
         self.running_event.set()
@@ -251,7 +251,8 @@ class CollectorBase(object):
         self.replay_buffer = replay_buffer(capacity=buffer_capacity, initializer=self.manager.list,
                                            Value=self.manager.Value, Lock=self.manager.Lock)
 
-        self.env = env
+        self.env_func = env_func
+        self.env_kwargs = env_kwargs
         self.devices = [device for _, device in zip(range(n_samplers), itertools.cycle(devices))]
         self.random_seed = random_seed
 
@@ -276,7 +277,7 @@ class CollectorBase(object):
         for rank in range(self.n_samplers):
             sampler = self.sampler(rank, self.n_samplers, self.lock,
                                    self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
-                                   self.env, self.state_encoder, self.policy_net,
+                                   self.env_func, self.env_kwargs, self.state_encoder, self.policy_net,
                                    self.eval_only, self.replay_buffer,
                                    self.total_steps, self.episode_steps, self.episode_rewards,
                                    n_episodes, max_episode_steps,
@@ -323,14 +324,21 @@ class CollectorBase(object):
 
 
 class Collector(CollectorBase):
-    def __init__(self, state_encoder, policy_net,
-                 env, buffer_capacity, n_samplers, devices, random_seed):
-        super().__init__(state_encoder, policy_net, Sampler, ReplayBuffer,
-                         env, buffer_capacity, n_samplers, devices, random_seed)
+    def __init__(self, env_func, env_kwargs, state_encoder, policy_net,
+                 n_samplers, buffer_capacity, devices, random_seed):
+        super().__init__(env_func, env_kwargs,
+                         state_encoder, policy_net,
+                         n_samplers, Sampler,
+                         ReplayBuffer, buffer_capacity,
+                         devices, random_seed)
 
 
 class TrajectoryCollector(CollectorBase):
-    def __init__(self, state_encoder, policy_net,
-                 env, buffer_capacity, n_samplers, devices, random_seed):
-        super().__init__(state_encoder, policy_net, TrajectorySampler, TrajectoryReplayBuffer,
-                         env, buffer_capacity, n_samplers, devices, random_seed)
+    def __init__(self, env_func, env_kwargs, state_encoder,
+                 policy_net, n_samplers, buffer_capacity,
+                 devices, random_seed):
+        super().__init__(env_func, env_kwargs,
+                         state_encoder, policy_net,
+                         n_samplers, TrajectorySampler,
+                         TrajectoryReplayBuffer, buffer_capacity,
+                         devices, random_seed)

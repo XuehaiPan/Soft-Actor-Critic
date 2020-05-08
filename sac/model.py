@@ -14,7 +14,8 @@ __all__ = ['build_model', 'ModelBase', 'TrainerBase', 'Trainer', 'Tester']
 
 
 def build_model(config):
-    model_kwargs = config.build_from_keys(['env',
+    model_kwargs = config.build_from_keys(['env_func',
+                                           'env_kwargs',
                                            'state_encoder',
                                            'state_dim',
                                            'action_dim',
@@ -51,7 +52,7 @@ def build_model(config):
 
 
 class ModelBase(object):
-    def __init__(self, env, state_encoder, state_encoder_wrapper,
+    def __init__(self, env_func, env_kwargs, state_encoder, state_encoder_wrapper,
                  state_dim, action_dim, hidden_dims, activation,
                  initial_alpha, n_samplers, collector, buffer_capacity,
                  devices, random_seed=0):
@@ -84,20 +85,16 @@ class ModelBase(object):
         ])
         self.modules.share_memory()
 
-        self.collector = collector(state_encoder=self.state_encoder,
+        self.collector = collector(env_func=env_func,
+                                   env_kwargs=env_kwargs,
+                                   state_encoder=self.state_encoder,
                                    policy_net=self.policy_net,
-                                   env=env,
-                                   buffer_capacity=buffer_capacity,
                                    n_samplers=n_samplers,
+                                   buffer_capacity=buffer_capacity,
                                    devices=self.devices,
                                    random_seed=random_seed)
 
     def print_info(self):
-        print(f'env = {self.env}')
-        observation_dim = self.env.observation_space.shape
-        if len(observation_dim) == 1:
-            observation_dim = observation_dim[0]
-        print(f'observation_dim = {observation_dim}')
         print(f'state_dim = {self.state_dim}')
         print(f'action_dim = {self.action_dim}')
         print(f'device = {self.model_device}')
@@ -144,11 +141,11 @@ class ModelBase(object):
 
 
 class TrainerBase(ModelBase):
-    def __init__(self, env, state_encoder, state_encoder_wrapper,
+    def __init__(self, env_func, env_kwargs, state_encoder, state_encoder_wrapper,
                  state_dim, action_dim, hidden_dims, activation,
                  initial_alpha, soft_q_lr, policy_lr, alpha_lr, weight_decay,
                  n_samplers, collector, buffer_capacity, devices, random_seed=0):
-        super().__init__(env, state_encoder, state_encoder_wrapper,
+        super().__init__(env_func, env_kwargs, state_encoder, state_encoder_wrapper,
                          state_dim, action_dim, hidden_dims, activation,
                          initial_alpha, n_samplers, collector, buffer_capacity,
                          devices, random_seed)

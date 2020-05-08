@@ -24,23 +24,19 @@ except ImportError:
 
 
 def initialize_environment(config):
-    build_env(config)
+    config.env_func = build_env
+    config.env_kwargs = config.build_from_keys(['vision_observation',
+                                                'image_size',
+                                                'n_frames',
+                                                'max_episode_steps',
+                                                'random_seed'])
+    config.env_kwargs.update(name=config.env)
 
+    with config.env_func(**config.env_kwargs) as env:
+        print(f'env = {env}')
+        print(f'observation_space.shape = {env.observation_space.shape}')
+        print(f'action_space.shape = {env.action_space.shape}')
 
-def build_env(config):
-    if not isinstance(config.env, gym.Env):
-        env = gym.make(config.env)
-        env.seed(config.random_seed)
-
-        env = NormalizedAction(FlattenedAction(env))
-        if config.vision_observation:
-            env = VisionObservation(env, image_size=(config.image_size, config.image_size))
-        else:
-            env = FlattenedObservation(env)
-        if config.n_frames > 1:
-            env = ConcatenatedObservation(env, n_frames=config.n_frames, dim=0)
-
-        config.env = env
         config.observation_dim = env.observation_space.shape[0]
         config.action_dim = env.action_space.shape[0]
         try:
@@ -49,8 +45,22 @@ def build_env(config):
             pass
         except TypeError:
             pass
+        config.env_kwargs['max_episode_steps'] = config.max_episode_steps
 
-    return config.env
+
+def build_env(**kwargs):
+    env = gym.make(kwargs['name'])
+    env.seed(kwargs['random_seed'])
+
+    env = NormalizedAction(FlattenedAction(env))
+    if kwargs['vision_observation']:
+        env = VisionObservation(env, image_size=(kwargs['image_size'], kwargs['image_size']))
+    else:
+        env = FlattenedObservation(env)
+    if kwargs['n_frames'] > 1:
+        env = ConcatenatedObservation(env, n_frames=kwargs['n_frames'], dim=0)
+
+    return env
 
 
 class FlattenedAction(gym.ActionWrapper):
