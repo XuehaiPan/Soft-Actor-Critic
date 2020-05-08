@@ -39,4 +39,5 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--weight-decay 1E-5 --random-seed 0 \
 	--log-episode-video \
 	--log-dir "$LOG_DIR" \
-	--checkpoint-dir "$CHECKPOINT_DIR"
+	--checkpoint-dir "$CHECKPOINT_DIR" \
+	"$@" # script arguments (can override above args)

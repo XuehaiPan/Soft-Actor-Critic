@@ -27,4 +27,5 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--random-seed 0 \
 	--log-dir "$LOG_DIR" \
 	--checkpoint-dir "$CHECKPOINT_DIR" \
-	--load-checkpoint
+	--load-checkpoint \
+	"$@" # script arguments (can override above args)

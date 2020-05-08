@@ -35,6 +35,8 @@ pip3 install -r requirements.txt
 # train/test FC controller without state encoder
 bash scripts/train_identity.sh
 bash scripts/test_identity.sh
+# override arguments in script file
+bash scripts/train_identity.sh --env "BipedalWalker-v3" --n-epochs 5000
 
 # train/test FC controller with FC state encoder
 bash scripts/train_fc.sh
