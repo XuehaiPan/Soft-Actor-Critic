@@ -83,8 +83,9 @@ class ModelBase(object):
             ('policy_net', self.policy_net),
             ('params', nn.ParameterDict({'log_alpha': self.log_alpha}))
         ])
-        self.modules.share_memory()
 
+        self.state_encoder.share_memory()
+        self.policy_net.share_memory()
         self.collector = collector(env_func=env_func,
                                    env_kwargs=env_kwargs,
                                    state_encoder=self.state_encoder,
