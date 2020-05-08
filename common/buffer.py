@@ -103,9 +103,9 @@ class TrajectoryReplayBuffer(ReplayBuffer):
         batch = map(torch.FloatTensor, map(np.stack, zip(*batch)))
 
         # size: (seq_len, batch_size, item_size)
-        observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.transpose(0, 1), batch))
+        batch = tuple(map(lambda tensor: tensor.transpose(0, 1), batch))
         hidden = cat_hidden(hiddens=hiddens, dim=1)
-        return observation, action, reward, next_observation, done, hidden
+        return (*batch, hidden)
 
     @property
     def size(self):
