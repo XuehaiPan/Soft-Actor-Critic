@@ -49,6 +49,16 @@ bash scripts/test_rnn.sh
 # train/test FC controller with CNN state encoder
 bash scripts/train_cnn.sh
 bash scripts/test_cnn.sh
+
+# for device arguments
+# train and sample on 'cuda:0'
+bash scripts/train_identity.sh --gpu --n-samplers 4
+# train on 'cuda:0' and sample on ('cuda:1', 'cuda:2', 'cuda:3', 'cuda:4')
+bash scripts/train_identity.sh --gpu 0 1 2 3 4 --n-samplers 4
+# train on 'cuda:0' and sample on ('cuda:1', 'cuda:2', 'cuda:0', 'cuda:1')
+bash scripts/train_identity.sh --gpu 0 1 2 --n-samplers 4
+# train on 'cuda:0' and sample on ('cuda:1', 'cuda:2', 'cpu', 'cpu')
+bash scripts/train_identity.sh --gpu 0 1 2 c c --n-samplers 4
 ```
 
 You can use `python3 main.py --help` for more details:
@@ -84,7 +94,9 @@ optional arguments:
   -h, --help            show this help message and exit
   --mode {train,test}   mode (default: train)
   --gpu CUDA_DEVICE [CUDA_DEVICE ...]
-                        GPU devices (use CPU if not present)
+                        GPU device indexes (int for CUDA device or 'c'/'cpu'
+                        for CPU) (use 'cuda:0' if no following arguments; use
+                        CPU if not present)
   --env ENV             environment to train on (default: Pendulum-v0)
   --n-frames N_FRAMES   concatenate original N consecutive observations as a
                         new observation (default: 1)

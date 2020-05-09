@@ -29,11 +29,19 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_config():
+    def gpu_type(device):
+        try:
+            return int(device)
+        except ValueError:
+            return device
+
     parser = argparse.ArgumentParser(description='Train or test Soft Actor-Critic controller.')
     parser.add_argument('--mode', type=str, choices=['train', 'test'], default='train',
                         help='mode (default: train)')
-    parser.add_argument('--gpu', type=int, default=None, nargs='+', metavar='CUDA_DEVICE',
-                        help='GPU devices (use CPU if not present)')
+    parser.add_argument('--gpu', type=gpu_type, default=None, nargs='+', metavar='CUDA_DEVICE',
+                        help="GPU device indexes "
+                             "(int for CUDA device or 'c'/'cpu' for CPU) "
+                             "(use 'cuda:0' if no following arguments; use CPU if not present)")
     parser.add_argument('--env', type=str, default='Pendulum-v0',
                         help='environment to train on (default: Pendulum-v0)')
     parser.add_argument('--n-frames', type=int, default=1,

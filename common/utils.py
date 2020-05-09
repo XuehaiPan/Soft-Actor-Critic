@@ -17,11 +17,14 @@ def clone_network(src_net, device=None):
     dst_net = copy.deepcopy(src_net)
 
     if device is not None:
-        try:
-            dst_net.device = device
-        except AttributeError:
-            pass
-        dst_net.to(device)
+        def set_device(module):
+            try:
+                module.device = device
+            except AttributeError:
+                pass
+            module.to(device)
+
+        dst_net.apply(set_device)
 
     return dst_net
 
@@ -39,7 +42,12 @@ def check_devices(config):
     if config.gpu is not None and torch.cuda.is_available():
         if len(config.gpu) == 0:
             config.gpu = [0]
-        devices = [torch.device(f'cuda:{cuda_device}') for cuda_device in config.gpu]
+        devices = []
+        for device in config.gpu:
+            if isinstance(device, int):
+                devices.append(torch.device(f'cuda:{device}'))
+            elif device in ('c', 'cpu', 'C', 'CPU'):
+                devices.append(torch.device('cpu'))
     else:
         devices = [torch.device('cpu')]
 
