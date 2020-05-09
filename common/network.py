@@ -34,6 +34,7 @@ def build_encoder(config):
                                                n_dims_after_lstm=[*config.encoder_hidden_dims_after_lstm,
                                                                   config.state_dim],
                                                skip_connection=config.skip_connection,
+                                               trainable_initial_hidden=False,
                                                activation=config.activation,
                                                output_activation=None)
     elif config.CNN_encoder:
