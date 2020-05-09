@@ -145,9 +145,9 @@ def initialize(config):
     torch.manual_seed(config.random_seed)
 
     initialize_hyperparameters(config)
+    initialize_environment(config)
     check_devices(config)
     check_logging(config)
-    initialize_environment(config)
     build_encoder(config)
 
 

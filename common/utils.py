@@ -1,5 +1,6 @@
 import copy
 import glob
+import json
 import os
 import re
 
@@ -59,6 +60,10 @@ def get_checkpoint(checkpoint_dir, by='epoch'):
 def check_logging(config):
     os.makedirs(config.log_dir, exist_ok=True)
     os.makedirs(config.checkpoint_dir, exist_ok=True)
+
+    for directory in (config.log_dir, config.checkpoint_dir):
+        with open(file=os.path.join(directory, 'args.json'), mode='w') as file:
+            json.dump(config, file, indent=4, default=str)
 
     if config.mode == 'test' or config.load_checkpoint:
         initial_checkpoint = get_checkpoint(config.checkpoint_dir, by='epoch')

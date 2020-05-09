@@ -1,4 +1,5 @@
 import itertools
+import os
 
 import numpy as np
 import torch
@@ -44,6 +45,9 @@ def build_model(config):
 
     model = Model(**model_kwargs)
     model.print_info()
+    for directory in (config.log_dir, config.checkpoint_dir):
+        with open(file=os.path.join(directory, 'info.txt'), mode='w') as file:
+            model.print_info(file=file)
 
     if config.initial_checkpoint is not None:
         model.load_model(path=config.initial_checkpoint)
@@ -95,14 +99,14 @@ class ModelBase(object):
                                    devices=self.devices,
                                    random_seed=random_seed)
 
-    def print_info(self):
-        print(f'state_dim = {self.state_dim}')
-        print(f'action_dim = {self.action_dim}')
-        print(f'device = {self.model_device}')
-        print(f'buffer_capacity = {self.replay_buffer.capacity}')
-        print(f'n_samplers = {self.collector.n_samplers}')
-        print(f'sampler_devices = {list(map(str, self.collector.devices))}')
-        print('Modules:', self.modules)
+    def print_info(self, file=None):
+        print(f'state_dim = {self.state_dim}', file=file)
+        print(f'action_dim = {self.action_dim}', file=file)
+        print(f'device = {self.model_device}', file=file)
+        print(f'buffer_capacity = {self.replay_buffer.capacity}', file=file)
+        print(f'n_samplers = {self.collector.n_samplers}', file=file)
+        print(f'sampler_devices = {list(map(str, self.collector.devices))}', file=file)
+        print('Modules:', self.modules, file=file)
 
     @property
     def env(self):
