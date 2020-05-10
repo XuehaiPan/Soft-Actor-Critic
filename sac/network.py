@@ -8,7 +8,11 @@ from torch.distributions import Normal
 from common.network import NetworkBase, MultilayerPerceptron
 
 
-__all__ = ['StateEncoderWrapper', 'ActionScaler', 'ValueNetwork', 'SoftQNetwork', 'PolicyNetwork']
+__all__ = [
+    'StateEncoderWrapper',
+    'ActionScaler', 'ValueNetwork', 'SoftQNetwork',
+    'PolicyNetwork'
+]
 
 DEVICE_CPU = torch.device('cpu')
 
@@ -150,7 +154,7 @@ class SoftQNetwork(MultilayerPerceptron):
 
 class PolicyNetwork(MultilayerPerceptron):
     def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU,
-                 log_std_min=-20, log_std_max=2):
+                 log_std_min=np.log(1E-8), log_std_max=np.log(20.0)):
         super().__init__(n_dims=[state_dim, *hidden_dims, 2 * action_dim],
                          activation=activation,
                          output_activation=None,
@@ -176,7 +180,7 @@ class PolicyNetwork(MultilayerPerceptron):
         action = torch.tanh(u)
         log_prob = distribution.log_prob(u) - torch.log(1.0 - action.pow(2) + epsilon)
         log_prob = log_prob.sum(dim=-1, keepdim=True)
-        return action, log_prob
+        return action, log_prob, distribution
 
     def get_action(self, state, deterministic=False):
         with torch.no_grad():

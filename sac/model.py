@@ -188,7 +188,7 @@ class TrainerBase(ModelBase):
                 reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
 
         # Update temperature parameter
-        new_action, log_prob = self.actor.evaluate(state)
+        new_action, log_prob, _ = self.actor.evaluate(state)
         if adaptive_entropy is True:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
@@ -201,7 +201,7 @@ class TrainerBase(ModelBase):
         predicted_q_value_1 = self.critic['soft_q_net_1'](state, action)
         predicted_q_value_2 = self.critic['soft_q_net_2'](state, action)
         with torch.no_grad():
-            new_next_action, next_log_prob = self.actor.evaluate(next_state)
+            new_next_action, next_log_prob, _ = self.actor.evaluate(next_state)
 
             target_q_min = torch.min(self.target_critic['soft_q_net_1'](next_state, new_next_action),
                                      self.target_critic['soft_q_net_2'](next_state, new_next_action))
