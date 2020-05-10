@@ -183,6 +183,7 @@ class RecurrentNeuralNetwork(NetworkBase):
                                                    hidden_size=n_dims_lstm_hidden[i + 1],
                                                    num_layers=1, bias=True,
                                                    batch_first=False, bidirectional=False))
+
         if trainable_initial_hidden:
             self.init_hiddens = nn.ParameterList()
             self.init_cells = nn.ParameterList()
@@ -199,9 +200,9 @@ class RecurrentNeuralNetwork(NetworkBase):
             self.init_cells = []
             for i in range(len(n_dims_lstm_hidden) - 1):
                 self.init_hiddens.append(torch.zeros(1, 1, n_dims_lstm_hidden[i + 1],
-                                                     device=self.device, requires_grad=False))
+                                                     device=DEVICE_CPU, requires_grad=False))
                 self.init_cells.append(torch.zeros(1, 1, n_dims_lstm_hidden[i + 1],
-                                                   device=self.device, requires_grad=False))
+                                                   device=DEVICE_CPU, requires_grad=False))
 
         self.linear_layers_after_lstm = VanillaNeuralNetwork(n_dims=n_dims_after_lstm,
                                                              activation=activation,
@@ -228,6 +229,7 @@ class RecurrentNeuralNetwork(NetworkBase):
 
     def initial_hiddens(self, batch_size=1):
         init_hidden = LSTMHidden(hidden=list(zip(self.init_hiddens, self.init_cells)))
+        init_hidden = init_hidden.to(self.device)
         return init_hidden.repeat(1, batch_size, 1)
 
 
