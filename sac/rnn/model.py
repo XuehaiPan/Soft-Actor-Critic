@@ -17,7 +17,7 @@ class Trainer(TrainerBase):
     def update(self, batch_size, step_size=16,
                normalize_rewards=True, reward_scale=1.0,
                adaptive_entropy=True, target_entropy=-2.0,
-               gamma=0.99, soft_tau=0.01, epsilon=1E-6):
+               clip_gradient=False, gamma=0.99, soft_tau=0.01, epsilon=1E-6):
         self.train()
 
         # size: (seq_len, batch_size, item_size)
@@ -38,7 +38,7 @@ class Trainer(TrainerBase):
         return self.update_sac(state, action, reward, next_state, done,
                                normalize_rewards, reward_scale,
                                adaptive_entropy, target_entropy,
-                               gamma, soft_tau, epsilon)
+                               clip_gradient, gamma, soft_tau, epsilon)
 
 
 class Tester(ModelBase):

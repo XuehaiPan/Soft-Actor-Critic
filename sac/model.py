@@ -183,7 +183,7 @@ class TrainerBase(ModelBase):
     def update_sac(self, state, action, reward, next_state, done,
                    normalize_rewards=True, reward_scale=1.0,
                    adaptive_entropy=True, target_entropy=-2.0,
-                   gamma=0.99, soft_tau=0.01, epsilon=1E-6):
+                   clip_gradient=False, gamma=0.99, soft_tau=0.01, epsilon=1E-6):
         # Normalize rewards
         if normalize_rewards:
             with torch.no_grad():
@@ -224,9 +224,11 @@ class TrainerBase(ModelBase):
         loss = soft_q_loss + self.policy_loss_weight * policy_loss_unbiased
         self.optimizer.zero_grad()
         loss.backward()
-        for param_group in self.optimizer.param_groups:
-            nn.utils.clip_grad.clip_grad_norm_(param_group['params'],
-                                               max_norm=0.1 * np.sqrt(param_group['n_params']), norm_type=2)
+        if clip_gradient:
+            for param_group in self.optimizer.param_groups:
+                nn.utils.clip_grad.clip_grad_norm_(param_group['params'],
+                                                   max_norm=0.1 * np.sqrt(param_group['n_params']),
+                                                   norm_type=2)
         self.optimizer.step()
 
         # Soft update the target value net
@@ -240,7 +242,7 @@ class TrainerBase(ModelBase):
 
     def update(self, batch_size, normalize_rewards=True, reward_scale=1.0,
                adaptive_entropy=True, target_entropy=-2.0,
-               gamma=0.99, soft_tau=0.01, epsilon=1E-6):
+               clip_gradient=False, gamma=0.99, soft_tau=0.01, epsilon=1E-6):
         self.train()
 
         # size: (batch_size, item_size)
@@ -254,7 +256,7 @@ class TrainerBase(ModelBase):
         return self.update_sac(state, action, reward, next_state, done,
                                normalize_rewards, reward_scale,
                                adaptive_entropy, target_entropy,
-                               gamma, soft_tau, epsilon)
+                               clip_gradient, gamma, soft_tau, epsilon)
 
     def load_model(self, path):
         super().load_model(path=path)

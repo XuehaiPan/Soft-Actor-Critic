@@ -84,6 +84,7 @@ def train(model, config):
                                             'normalize_rewards',
                                             'reward_scale',
                                             'adaptive_entropy',
+                                            'clip_gradient',
                                             'gamma',
                                             'soft_tau'])
     update_kwargs.update(target_entropy=-1.0 * config.action_dim)

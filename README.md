@@ -85,8 +85,9 @@ usage: main.py [-h] [--mode {train,test}]
                [--soft-q-lr SOFT_Q_LR] [--policy-lr POLICY_LR]
                [--alpha-lr ALPHA_LR] [--initial-alpha ALPHA]
                [--adaptive-entropy] [--weight-decay WEIGHT_DECAY]
-               [--random-seed SEED] [--log-episode-video] [--log-dir LOG_DIR]
-               [--checkpoint-dir CHECKPOINT_DIR] [--load-checkpoint]
+               [--clip-gradient] [--random-seed SEED] [--log-episode-video]
+               [--log-dir LOG_DIR] [--checkpoint-dir CHECKPOINT_DIR]
+               [--load-checkpoint]
 
 Train or test Soft Actor-Critic controller.
 
@@ -130,6 +131,7 @@ optional arguments:
   --deterministic       deterministic in evaluation
   --weight-decay WEIGHT_DECAY
                         weight decay (default: 0.0)
+  --clip-gradient       clip gradient on optimizer step
   --random-seed SEED    random seed (default: 0)
   --log-episode-video   save rendered episode videos to TensorBoard logs
   --log-dir LOG_DIR     folder to save TensorBoard logs

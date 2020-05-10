@@ -127,6 +127,8 @@ def get_config():
                              help='auto update temperature parameter while training')
     parser.add_argument('--weight-decay', type=float, default=0.0,
                         help='weight decay (default: 0.0)')
+    parser.add_argument('--clip-gradient', action='store_true',
+                        help='clip gradient on optimizer step')
     parser.add_argument('--random-seed', type=int, default=0, metavar='SEED',
                         help='random seed (default: 0)')
     parser.add_argument('--log-episode-video', action='store_true',
