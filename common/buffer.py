@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 import torch
 import torch.multiprocessing as mp
@@ -87,16 +85,23 @@ class TrajectoryReplayBuffer(ReplayBuffer):
         with self.lock:
             lengths = np.asanyarray(self.lengths)
         weights = lengths / lengths.sum()
-        for i in range(batch_size):
+        while len(batch) < batch_size:
             while True:
                 index = np.random.choice(len(weights), p=weights)
                 *items, hidden = self.buffer[index]
                 length = len(items[0])
-                if length >= step_size:
-                    offset = random.randint(0, length - step_size)
+                if length < step_size:
+                    continue
+                offsets = np.arange(step_size, length - step_size, step_size, dtype=np.int64)
+                np.random.shuffle(offsets)
+                for offset in [length - step_size, 0, *offsets]:
                     batch.append([item[offset:offset + step_size] for item in items])
                     hiddens.append(hidden[offset].float().unsqueeze(dim=0))
+                if len(batch) >= batch_size:
                     break
+        while len(batch) > batch_size:
+            batch.pop()
+            hiddens.pop()
 
         # size: (batch_size, seq_len, item_size)
         # observation, action, reward, next_observation, done
