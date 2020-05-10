@@ -17,14 +17,7 @@ def clone_network(src_net, device=None):
     dst_net = copy.deepcopy(src_net)
 
     if device is not None:
-        def set_device(module):
-            try:
-                module.device = device
-            except AttributeError:
-                pass
-            module.to(device)
-
-        dst_net.apply(set_device)
+        dst_net.to(device)
 
     return dst_net
 

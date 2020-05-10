@@ -5,8 +5,6 @@ from sac.network import StateEncoderWrapper as OriginalStateEncoderWrapper
 
 __all__ = ['StateEncoderWrapper']
 
-DEVICE_CPU = torch.device('cpu')
-
 
 class StateEncoderWrapper(OriginalStateEncoderWrapper):
     def encode(self, observation, hidden=None):

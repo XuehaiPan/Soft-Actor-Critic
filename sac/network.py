@@ -16,15 +16,12 @@ __all__ = [
     'PolicyNetwork'
 ]
 
-DEVICE_CPU = torch.device('cpu')
-
 
 class StateEncoderWrapper(NetworkBase):
-    def __init__(self, encoder, device=DEVICE_CPU):
+    def __init__(self, encoder, device=None):
         super().__init__()
 
         self.encoder = encoder
-        self.device = device
 
         self.to(device)
 
@@ -40,9 +37,8 @@ class StateEncoderWrapper(NetworkBase):
 
 
 class DimensionScaler(NetworkBase):
-    def __init__(self, input_dim, output_dim, device=DEVICE_CPU):
+    def __init__(self, input_dim, output_dim, device=None):
         super().__init__()
-        self.device = device
 
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -126,7 +122,7 @@ class DimensionScaler(NetworkBase):
 
 
 class ValueNetwork(MultilayerPerceptron):
-    def __init__(self, state_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU):
+    def __init__(self, state_dim, hidden_dims, activation=F.relu, device=None):
         super().__init__(n_dims=[state_dim, *hidden_dims, 1],
                          activation=activation,
                          output_activation=None,
@@ -139,7 +135,7 @@ class ValueNetwork(MultilayerPerceptron):
 
 
 class SoftQNetwork(MultilayerPerceptron):
-    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU):
+    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None):
         scaled_action_dim = max(state_dim, action_dim)
 
         super().__init__(n_dims=[state_dim + scaled_action_dim, *hidden_dims, 1],
@@ -160,7 +156,7 @@ class SoftQNetwork(MultilayerPerceptron):
 
 
 class PolicyNetwork(MultilayerPerceptron):
-    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=DEVICE_CPU,
+    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None,
                  log_std_min=np.log(1E-8), log_std_max=np.log(20.0)):
         super().__init__(n_dims=[state_dim, *hidden_dims, 2 * action_dim],
                          activation=activation,

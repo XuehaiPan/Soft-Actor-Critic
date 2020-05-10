@@ -14,8 +14,6 @@ __all__ = [
     'ConvolutionalNeuralNetwork', 'CNN'
 ]
 
-DEVICE_CPU = torch.device('cpu')
-
 
 def build_encoder(config):
     state_dim = (config.state_dim or config.observation_dim)
@@ -57,7 +55,7 @@ def build_encoder(config):
 
 
 class NetworkBase(nn.Module):
-    def __init__(self, modules=None, device=DEVICE_CPU):
+    def __init__(self, modules=None, device=None):
         super().__init__()
         self.device = device
 
@@ -65,6 +63,16 @@ class NetworkBase(nn.Module):
             self.modules = modules
 
         self.to(device)
+
+    def to(self, *args, **kwargs):
+        device, dtype, non_blocking = torch._C._nn._parse_to(*args, **kwargs)
+        if device is not None:
+            device = torch.device(device)
+            for module in self.children():
+                if isinstance(module, NetworkBase):
+                    module.to(device)
+            self.device = device
+        return super().to(*args, **kwargs)
 
     def save_model(self, path):
         torch.save(self.state_dict(), path)
@@ -74,9 +82,8 @@ class NetworkBase(nn.Module):
 
 
 class VanillaNeuralNetwork(NetworkBase):
-    def __init__(self, n_dims, activation=F.relu, output_activation=None, device=DEVICE_CPU):
+    def __init__(self, n_dims, activation=F.relu, output_activation=None, device=None):
         super().__init__()
-        self.device = device
 
         self.activation = activation
         self.output_activation = output_activation
@@ -157,11 +164,10 @@ cat_hidden = GRUHidden.cat
 class RecurrentNeuralNetwork(NetworkBase):
     def __init__(self, n_dims_before_rnn, n_dims_rnn_hidden, n_dims_after_rnn,
                  skip_connection, trainable_initial_hidden=True, activation=F.relu,
-                 output_activation=None, device=DEVICE_CPU):
+                 output_activation=None, device=None):
         assert len(n_dims_rnn_hidden) > 0
 
         super().__init__()
-        self.device = device
 
         n_dims_rnn_hidden = [n_dims_before_rnn[-1], *n_dims_rnn_hidden]
         n_dims_after_rnn = [n_dims_rnn_hidden[-1], *n_dims_after_rnn]
@@ -195,7 +201,7 @@ class RecurrentNeuralNetwork(NetworkBase):
             self.init_hiddens = []
             for i in range(len(n_dims_rnn_hidden) - 1):
                 self.init_hiddens.append(torch.zeros(1, 1, n_dims_rnn_hidden[i + 1],
-                                                     device=DEVICE_CPU, requires_grad=False))
+                                                     device=torch.device('cpu'), requires_grad=False))
 
         self.linear_layers_after_rnn = VanillaNeuralNetwork(n_dims=n_dims_after_rnn,
                                                             activation=activation,
@@ -234,13 +240,12 @@ class ConvolutionalNeuralNetwork(NetworkBase):
     def __init__(self, image_size, input_channels, output_dim,
                  n_hidden_channels, kernel_sizes, strides, paddings,
                  poolings, batch_normalization, activation=F.relu,
-                 output_activation=None, device=DEVICE_CPU):
+                 output_activation=None, device=None):
         assert len(n_hidden_channels) == len(kernel_sizes)
         assert len(n_hidden_channels) == len(strides)
         assert len(n_hidden_channels) == len(paddings)
 
         super().__init__()
-        self.device = device
 
         n_hidden_channels = [input_channels, *n_hidden_channels]
 
@@ -272,7 +277,7 @@ class ConvolutionalNeuralNetwork(NetworkBase):
             for conv_layer, max_pooling_layer in zip(self.conv_layers, self.max_pooling_layers):
                 dummy = conv_layer(dummy)
                 dummy = max_pooling_layer(dummy)
-        conv_output_dim = np.prod(dummy.size())
+        conv_output_dim = int(np.prod(dummy.size()))
         self.linear_layer = nn.Linear(in_features=conv_output_dim,
                                       out_features=output_dim,
                                       bias=True)
@@ -281,7 +286,7 @@ class ConvolutionalNeuralNetwork(NetworkBase):
 
     def forward(self, x):
         input_size = x.size()
-        x = x.view(np.prod(input_size[:-3]), *input_size[-3:])
+        x = x.view(int(np.prod(input_size[:-3])), *input_size[-3:])
 
         for i, (conv_layer, max_pooling_layer) in enumerate(zip(self.conv_layers,
                                                                 self.max_pooling_layers)):
