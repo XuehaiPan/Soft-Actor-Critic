@@ -57,6 +57,8 @@ bash scripts/train_identity.sh --gpu --n-samplers 4
 bash scripts/train_identity.sh --gpu 0 1 2 3 4 --n-samplers 4
 # train on 'cuda:0' and sample on ('cuda:1', 'cuda:2', 'cuda:0', 'cuda:1')
 bash scripts/train_identity.sh --gpu 0 1 2 --n-samplers 4
+# train on 'cuda:0' and sample on ('cuda:1', 'cuda:2', 'cuda:1', 'cuda:2')
+bash scripts/train_identity.sh --gpu 0 1 2 1 2 --n-samplers 4
 # train on 'cuda:0' and sample on ('cuda:1', 'cuda:2', 'cpu', 'cpu')
 bash scripts/train_identity.sh --gpu 0 1 2 c c --n-samplers 4
 ```

@@ -15,7 +15,7 @@ mkdir -p "$LOG_DIR"
 cp "$0" "$LOG_DIR"
 
 PYTHONWARNINGS=ignore python3 main.py \
-	--mode test --gpu 0 1 2 3 \
+	--mode test --gpu 0 1 0 1 \
 	--env "$ENV" \
 	--vision-observation --image-size 128 \
 	--n-frames 3 \
