@@ -46,6 +46,10 @@ def train_loop(model, config, update_kwargs):
                                       global_step=model.global_step)
                     writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha,
                                       global_step=model.global_step)
+                    writer.add_scalar(tag='train/mean_episode_rewards', scalar_value=mean_episode_rewards,
+                                      global_step=model.global_step)
+                    writer.add_scalar(tag='train/mean_episode_steps', scalar_value=mean_episode_steps,
+                                      global_step=model.global_step)
                     writer.add_scalar(tag='train/buffer_size', scalar_value=buffer_size,
                                       global_step=model.global_step)
                     writer.add_scalar(tag='train/update_sample_ratio', scalar_value=update_sample_ratio,

@@ -9,12 +9,11 @@ import tqdm
 from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
-from common.buffer import ReplayBuffer, TrajectoryReplayBuffer
-from common.network import cat_hidden
+from common.buffer import ReplayBuffer, EpisodeReplayBuffer
 from common.utils import clone_network, sync_params
 
 
-__all__ = ['Collector', 'TrajectoryCollector']
+__all__ = ['Collector', 'EpisodeCollector']
 
 
 class Sampler(mp.Process):
@@ -180,7 +179,7 @@ class Sampler(mp.Process):
             return None
 
 
-class TrajectorySampler(Sampler):
+class EpisodeSampler(Sampler):
     def run(self):
         setproctitle(title=self.name)
 
@@ -204,7 +203,7 @@ class TrajectorySampler(Sampler):
             episode_steps = 0
             trajectory = []
             hiddens = []
-            hidden = state_encoder.initial_hiddens(batch_size=1)
+            hidden = None
             observation = self.env.reset()
             self.frames.clear()
             self.render()
@@ -215,7 +214,7 @@ class TrajectorySampler(Sampler):
                 if self.random_sample:
                     action = self.env.action_space.sample()
                 else:
-                    state, hidden = state_encoder.encode(observation, hidden=hidden)
+                    state, hidden, _ = state_encoder.encode(observation, hidden=hidden)
                     action = actor.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
@@ -223,18 +222,16 @@ class TrajectorySampler(Sampler):
 
                 episode_reward += reward
                 episode_steps += 1
-                trajectory.append((observation, action, [reward], next_observation, [done]))
+                trajectory.append((observation, action, [reward], [done]))
                 observation = next_observation
 
                 if done:
                     break
 
-            hiddens = cat_hidden(hiddens, dim=0).cpu().detach().numpy()
-
             self.running_event.wait()
             self.event.wait(timeout=self.timeout)
             with self.lock:
-                self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))), hiddens)
+                self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))))
                 self.n_total_steps.value += episode_steps
                 self.episode_steps.append(episode_steps)
                 self.episode_rewards.append(episode_reward)
@@ -358,12 +355,11 @@ class Collector(CollectorBase):
                          devices, random_seed)
 
 
-class TrajectoryCollector(CollectorBase):
-    def __init__(self, env_func, env_kwargs, state_encoder,
-                 actor, n_samplers, buffer_capacity,
-                 devices, random_seed):
+class EpisodeCollector(CollectorBase):
+    def __init__(self, env_func, env_kwargs, state_encoder, actor,
+                 n_samplers, buffer_capacity, devices, random_seed):
         super().__init__(env_func, env_kwargs,
                          state_encoder, actor,
-                         n_samplers, TrajectorySampler,
-                         TrajectoryReplayBuffer, buffer_capacity,
+                         n_samplers, EpisodeSampler,
+                         EpisodeReplayBuffer, buffer_capacity,
                          devices, random_seed)

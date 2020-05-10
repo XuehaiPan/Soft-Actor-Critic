@@ -9,7 +9,7 @@ __all__ = [
     'NetworkBase',
     'VanillaNeuralNetwork', 'VanillaNN',
     'MultilayerPerceptron', 'MLP',
-    'LSTMHidden', 'cat_hidden',
+    'GRUHidden', 'cat_hidden',
     'RecurrentNeuralNetwork', 'RNN',
     'ConvolutionalNeuralNetwork', 'CNN'
 ]
@@ -28,13 +28,13 @@ def build_encoder(config):
                                                  activation=config.activation,
                                                  output_activation=None)
     elif config.RNN_encoder:
-        state_encoder = RecurrentNeuralNetwork(n_dims_before_lstm=[config.observation_dim,
-                                                                   *config.encoder_hidden_dims_before_lstm],
-                                               n_dims_lstm_hidden=config.encoder_hidden_dims_lstm,
-                                               n_dims_after_lstm=[*config.encoder_hidden_dims_after_lstm,
-                                                                  config.state_dim],
+        state_encoder = RecurrentNeuralNetwork(n_dims_before_rnn=[config.observation_dim,
+                                                                  *config.encoder_hidden_dims_before_rnn],
+                                               n_dims_rnn_hidden=config.encoder_hidden_dims_rnn,
+                                               n_dims_after_rnn=[*config.encoder_hidden_dims_after_rnn,
+                                                                 config.state_dim],
                                                skip_connection=config.skip_connection,
-                                               trainable_initial_hidden=False,
+                                               trainable_initial_hidden=config.trainable_hidden,
                                                activation=config.activation,
                                                output_activation=None)
     elif config.CNN_encoder:
@@ -100,7 +100,7 @@ class VanillaNeuralNetwork(NetworkBase):
         return x
 
 
-class LSTMHidden(object):
+class GRUHidden(object):
     def __init__(self, hidden):
         self.hidden = hidden
 
@@ -112,9 +112,9 @@ class LSTMHidden(object):
 
     def __getitem__(self, item):
         new_hidden = []
-        for h, c in self.hidden:
-            new_hidden.append((h[item], c[item]))
-        return LSTMHidden(hidden=new_hidden)
+        for h in self.hidden:
+            new_hidden.append(h[item])
+        return GRUHidden(hidden=new_hidden)
 
     def __getattr__(self, item):
         attr = getattr(torch.Tensor, item)
@@ -124,111 +124,108 @@ class LSTMHidden(object):
 
             def func(*args, **kwargs):
                 new_hidden = []
-                for h, c in self_hidden:
-                    new_hidden.append((attr(h, *args, **kwargs), attr(c, *args, **kwargs)))
-                return LSTMHidden(hidden=new_hidden)
+                for h in self_hidden:
+                    new_hidden.append(attr(h, *args, **kwargs))
+                return GRUHidden(hidden=new_hidden)
 
             return func
         else:
             new_hidden = []
-            for h, c in self.hidden:
-                new_hidden.append((getattr(h, item), getattr(c, item)))
-            return LSTMHidden(hidden=new_hidden)
+            for h in self.hidden:
+                new_hidden.append(getattr(h, item))
+            return GRUHidden(hidden=new_hidden)
 
     def float(self):
         new_hidden = []
-        for h, c in self.hidden:
-            new_hidden.append((torch.FloatTensor(h), torch.FloatTensor(c)))
-        return LSTMHidden(hidden=new_hidden)
+        for h in self.hidden:
+            new_hidden.append(torch.FloatTensor(h))
+        return GRUHidden(hidden=new_hidden)
 
     @staticmethod
     def cat(hiddens, dim=0):
         hiddens = [hidden.hidden for hidden in hiddens]
         new_hidden = []
         for ith_layer_hiddens in zip(*hiddens):
-            hidden = torch.cat(list(map(lambda hc: hc[0], ith_layer_hiddens)), dim=dim)
-            cell = torch.cat(list(map(lambda hc: hc[1], ith_layer_hiddens)), dim=dim)
-            new_hidden.append((hidden, cell))
-        return LSTMHidden(hidden=new_hidden)
+            ith_layer_hiddens = torch.cat(ith_layer_hiddens, dim=dim)
+            new_hidden.append(ith_layer_hiddens)
+        return GRUHidden(hidden=new_hidden)
 
 
-cat_hidden = LSTMHidden.cat
+cat_hidden = GRUHidden.cat
 
 
 class RecurrentNeuralNetwork(NetworkBase):
-    def __init__(self, n_dims_before_lstm, n_dims_lstm_hidden, n_dims_after_lstm,
+    def __init__(self, n_dims_before_rnn, n_dims_rnn_hidden, n_dims_after_rnn,
                  skip_connection, trainable_initial_hidden=True, activation=F.relu,
                  output_activation=None, device=DEVICE_CPU):
-        assert len(n_dims_lstm_hidden) > 0
+        assert len(n_dims_rnn_hidden) > 0
 
         super().__init__()
         self.device = device
 
-        n_dims_lstm_hidden = [n_dims_before_lstm[-1], *n_dims_lstm_hidden]
-        n_dims_after_lstm = [n_dims_lstm_hidden[-1], *n_dims_after_lstm]
+        n_dims_rnn_hidden = [n_dims_before_rnn[-1], *n_dims_rnn_hidden]
+        n_dims_after_rnn = [n_dims_rnn_hidden[-1], *n_dims_after_rnn]
 
         self.skip_connection = skip_connection
         if skip_connection:
-            n_dims_after_lstm[0] += n_dims_before_lstm[-1]
+            n_dims_after_rnn[0] += n_dims_before_rnn[-1]
 
         self.activation = activation
         self.output_activation = output_activation
 
-        self.linear_layers_before_lstm = VanillaNeuralNetwork(n_dims=n_dims_before_lstm,
-                                                              activation=activation,
-                                                              output_activation=activation)
-        self.lstm_layers = nn.ModuleList()
-        for i in range(len(n_dims_lstm_hidden) - 1):
-            self.lstm_layers.append(module=nn.LSTM(input_size=n_dims_lstm_hidden[i],
-                                                   hidden_size=n_dims_lstm_hidden[i + 1],
-                                                   num_layers=1, bias=True,
-                                                   batch_first=False, bidirectional=False))
+        self.linear_layers_before_rnn = VanillaNeuralNetwork(n_dims=n_dims_before_rnn,
+                                                             activation=activation,
+                                                             output_activation=activation)
+
+        self.gru_layers = nn.ModuleList()
+        for i in range(len(n_dims_rnn_hidden) - 1):
+            self.gru_layers.append(module=nn.GRU(input_size=n_dims_rnn_hidden[i],
+                                                 hidden_size=n_dims_rnn_hidden[i + 1],
+                                                 num_layers=1, bias=True,
+                                                 batch_first=False, bidirectional=False))
 
         if trainable_initial_hidden:
             self.init_hiddens = nn.ParameterList()
-            self.init_cells = nn.ParameterList()
-            for i in range(len(n_dims_lstm_hidden) - 1):
-                bound = 1 / np.sqrt(n_dims_lstm_hidden[i])
-                hidden = nn.Parameter(torch.Tensor(1, 1, n_dims_lstm_hidden[i + 1]))
-                cell = nn.Parameter(torch.Tensor(1, 1, n_dims_lstm_hidden[i + 1]))
+            for i in range(len(n_dims_rnn_hidden) - 1):
+                bound = 1 / np.sqrt(n_dims_rnn_hidden[i])
+                hidden = nn.Parameter(torch.Tensor(1, 1, n_dims_rnn_hidden[i + 1]), requires_grad=True)
                 nn.init.uniform_(hidden, -bound, bound)
-                nn.init.uniform_(cell, -bound, bound)
                 self.init_hiddens.append(hidden)
-                self.init_cells.append(cell)
         else:
             self.init_hiddens = []
-            self.init_cells = []
-            for i in range(len(n_dims_lstm_hidden) - 1):
-                self.init_hiddens.append(torch.zeros(1, 1, n_dims_lstm_hidden[i + 1],
+            for i in range(len(n_dims_rnn_hidden) - 1):
+                self.init_hiddens.append(torch.zeros(1, 1, n_dims_rnn_hidden[i + 1],
                                                      device=DEVICE_CPU, requires_grad=False))
-                self.init_cells.append(torch.zeros(1, 1, n_dims_lstm_hidden[i + 1],
-                                                   device=DEVICE_CPU, requires_grad=False))
 
-        self.linear_layers_after_lstm = VanillaNeuralNetwork(n_dims=n_dims_after_lstm,
-                                                             activation=activation,
-                                                             output_activation=output_activation)
+        self.linear_layers_after_rnn = VanillaNeuralNetwork(n_dims=n_dims_after_rnn,
+                                                            activation=activation,
+                                                            output_activation=output_activation)
 
         self.to(device)
 
     def forward(self, x, hx=None):
         if hx is None:
             hx = self.initial_hiddens(batch_size=x.size(1))
-        assert isinstance(hx, LSTMHidden)
+        assert isinstance(hx, GRUHidden)
 
-        identity = x = self.linear_layers_before_lstm(x)
+        identity = x = self.linear_layers_before_rnn(x)
 
-        new_hx = []
-        for i, lstm_layer in enumerate(self.lstm_layers):
-            new_hx.append(None)
-            x, new_hx[-1] = lstm_layer(x, hx.hidden[i])
+        ha = []
+        hn = []
+        for i, gru_layer in enumerate(self.gru_layers):
+            hn.append(None)
+            x, hn[i] = gru_layer(x, hx.hidden[i])
+            ha.append(x)
 
         if self.skip_connection:
             x = torch.cat([x, identity], dim=-1)
-        x = self.linear_layers_after_lstm(x)
-        return x, LSTMHidden(hidden=new_hx)
+        x = self.linear_layers_after_rnn(x)
+        ha = GRUHidden(hidden=ha)
+        hn = GRUHidden(hidden=hn)
+        return x, hn, ha
 
     def initial_hiddens(self, batch_size=1):
-        init_hidden = LSTMHidden(hidden=list(zip(self.init_hiddens, self.init_cells)))
+        init_hidden = GRUHidden(hidden=list(self.init_hiddens))
         init_hidden = init_hidden.to(self.device)
         return init_hidden.repeat(1, batch_size, 1)
 

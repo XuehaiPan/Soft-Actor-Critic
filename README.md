@@ -71,10 +71,11 @@ usage: main.py [-h] [--mode {train,test}]
                [--image-size SIZE] [--hidden-dims DIM [DIM ...]]
                [--activation {ReLU,LeakyReLU}] [--encoder-arch {FC,RNN,CNN}]
                [--state-dim DIM] [--encoder-hidden-dims DIM [DIM ...]]
-               [--encoder-hidden-dims-before-lstm DIM [DIM ...]]
-               [--encoder-hidden-dims-lstm DIM [DIM ...]]
-               [--encoder-hidden-dims-after-lstm DIM [DIM ...]]
-               [--skip-connection] [--step-size STEP_SIZE]
+               [--encoder-hidden-dims-before-rnn DIM [DIM ...]]
+               [--encoder-hidden-dims-rnn DIM [DIM ...]]
+               [--encoder-hidden-dims-after-rnn DIM [DIM ...]]
+               [--skip-connection] [--trainable-hidden]
+               [--step-size STEP_SIZE]
                [--encoder-hidden-channels CHN [CHN ...]]
                [--kernel-sizes K [K ...]] [--strides S [S ...]]
                [--paddings P [P ...]] [--poolings K [K ...]]
@@ -154,16 +155,18 @@ FC state encoder:
                         hidden dimensions of FC state encoder
 
 RNN state encoder:
-  --encoder-hidden-dims-before-lstm DIM [DIM ...]
-                        hidden FC dimensions before LSTM layers in RNN state
+  --encoder-hidden-dims-before-rnn DIM [DIM ...]
+                        hidden FC dimensions before GRU layers in RNN state
                         encoder
-  --encoder-hidden-dims-lstm DIM [DIM ...]
-                        LSTM hidden dimensions of RNN controller
-  --encoder-hidden-dims-after-lstm DIM [DIM ...]
-                        hidden FC dimensions after LSTM layers in RNN state
+  --encoder-hidden-dims-rnn DIM [DIM ...]
+                        GRU hidden dimensions of RNN state encoder
+  --encoder-hidden-dims-after-rnn DIM [DIM ...]
+                        hidden FC dimensions after GRU layers in RNN state
                         encoder
-  --skip-connection     add skip connection beside LSTM layers in RNN state
+  --skip-connection     add skip connection beside GRU layers in RNN state
                         encoder
+  --trainable-hidden    set initial hidden of GRU layers trainable (use zeros
+                        as initial hidden if not present)
   --step-size STEP_SIZE
                         number of continuous steps for update (default: 16)
 

@@ -65,14 +65,17 @@ def get_config():
     fc_encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
                                   help='hidden dimensions of FC state encoder')
     rnn_encoder_group = parser.add_argument_group('RNN state encoder')
-    rnn_encoder_group.add_argument('--encoder-hidden-dims-before-lstm', type=int, default=[], nargs='+', metavar='DIM',
-                                   help='hidden FC dimensions before LSTM layers in RNN state encoder')
-    rnn_encoder_group.add_argument('--encoder-hidden-dims-lstm', type=int, default=[], nargs='+', metavar='DIM',
-                                   help='LSTM hidden dimensions of RNN controller')
-    rnn_encoder_group.add_argument('--encoder-hidden-dims-after-lstm', type=int, default=[], nargs='+', metavar='DIM',
-                                   help='hidden FC dimensions after LSTM layers in RNN state encoder')
+    rnn_encoder_group.add_argument('--encoder-hidden-dims-before-rnn', type=int, default=[], nargs='+', metavar='DIM',
+                                   help='hidden FC dimensions before GRU layers in RNN state encoder')
+    rnn_encoder_group.add_argument('--encoder-hidden-dims-rnn', type=int, default=[], nargs='+', metavar='DIM',
+                                   help='GRU hidden dimensions of RNN state encoder')
+    rnn_encoder_group.add_argument('--encoder-hidden-dims-after-rnn', type=int, default=[], nargs='+', metavar='DIM',
+                                   help='hidden FC dimensions after GRU layers in RNN state encoder')
     rnn_encoder_group.add_argument('--skip-connection', action='store_true', default=False,
-                                   help='add skip connection beside LSTM layers in RNN state encoder')
+                                   help='add skip connection beside GRU layers in RNN state encoder')
+    rnn_encoder_group.add_argument('--trainable-hidden', action='store_true', default=False,
+                                   help='set initial hidden of GRU layers trainable '
+                                        '(use zeros as initial hidden if not present)')
     rnn_encoder_group.add_argument('--step-size', type=int, default=16,
                                    help='number of continuous steps for update (default: 16)')
     cnn_encoder_group = parser.add_argument_group('CNN state encoder')

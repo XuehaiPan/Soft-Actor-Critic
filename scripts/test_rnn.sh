@@ -21,9 +21,9 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--activation LeakyReLU \
 	--encoder-arch RNN \
 	--state-dim 128 \
-	--encoder-hidden-dims-before-lstm 128 \
-	--encoder-hidden-dims-lstm 64 \
-	--encoder-hidden-dims-after-lstm 128 \
+	--encoder-hidden-dims-before-rnn 128 \
+	--encoder-hidden-dims-rnn 64 \
+	--encoder-hidden-dims-after-rnn 128 \
 	--skip-connection \
 	--n-episodes 100 \
 	--n-samplers 4 \

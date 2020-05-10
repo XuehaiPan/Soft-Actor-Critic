@@ -1,11 +1,8 @@
 import numpy as np
-import torch
 import torch.multiprocessing as mp
 
-from common.network import cat_hidden
 
-
-__all__ = ['ReplayBuffer', 'TrajectoryReplayBuffer']
+__all__ = ['ReplayBuffer', 'EpisodeReplayBuffer']
 
 
 class ReplayBuffer(object):
@@ -40,7 +37,7 @@ class ReplayBuffer(object):
 
         # size: (batch_size, item_size)
         # observation, action, reward, next_observation, done
-        return tuple(map(torch.FloatTensor, map(np.stack, zip(*batch))))
+        return tuple(map(np.stack, zip(*batch)))
 
     def __len__(self):
         return self.size
@@ -58,7 +55,7 @@ class ReplayBuffer(object):
         self.buffer_offset.value = value
 
 
-class TrajectoryReplayBuffer(ReplayBuffer):
+class EpisodeReplayBuffer(ReplayBuffer):
     def __init__(self, capacity, initializer, Value=mp.Value, Lock=mp.Lock()):
         super().__init__(capacity=capacity, initializer=initializer, Value=Value, Lock=Lock)
         self.lengths = initializer()
@@ -79,38 +76,27 @@ class TrajectoryReplayBuffer(ReplayBuffer):
                 self.lengths[self.offset] = length
                 self.offset = (self.offset + 1) % (len(self.buffer))
 
-    def sample(self, batch_size, step_size):
-        batch = []
-        hiddens = []
+    def sample(self, batch_size, min_length=16):
         with self.lock:
             lengths = np.asanyarray(self.lengths)
         weights = lengths / lengths.sum()
-        while len(batch) < batch_size:
+
+        episodes = []
+        lengths = []
+        for i in range(batch_size):
             while True:
                 index = np.random.choice(len(weights), p=weights)
-                *items, hidden = self.buffer[index]
+
+                # size: (length, item_size)
+                # observation, action, reward, done
+                items = self.buffer[index]
                 length = len(items[0])
-                if length < step_size:
-                    continue
-                offsets = np.arange(step_size, length - step_size, step_size, dtype=np.int64)
-                np.random.shuffle(offsets)
-                for offset in [length - step_size, 0, *offsets]:
-                    batch.append([item[offset:offset + step_size] for item in items])
-                    hiddens.append(hidden[offset].float().unsqueeze(dim=0))
-                if len(batch) >= batch_size:
+                if length >= min_length:
+                    episodes.append(items)
+                    lengths.append(length)
                     break
-        while len(batch) > batch_size:
-            batch.pop()
-            hiddens.pop()
 
-        # size: (batch_size, seq_len, item_size)
-        # observation, action, reward, next_observation, done
-        batch = map(torch.FloatTensor, map(np.stack, zip(*batch)))
-
-        # size: (seq_len, batch_size, item_size)
-        batch = tuple(map(lambda tensor: tensor.transpose(0, 1), batch))
-        hidden = cat_hidden(hiddens=hiddens, dim=1)
-        return (*batch, hidden)
+        return episodes, lengths
 
     @property
     def size(self):

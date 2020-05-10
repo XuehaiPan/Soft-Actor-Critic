@@ -243,17 +243,25 @@ class TrainerBase(ModelBase):
         self.train()
 
         # size: (batch_size, item_size)
-        observation, action, reward, next_observation, done = tuple(map(lambda tensor: tensor.to(self.model_device),
-                                                                        self.replay_buffer.sample(batch_size)))
-
-        state = self.state_encoder(observation)
-        with torch.no_grad():
-            next_state = self.state_encoder(next_observation)
+        state, action, reward, next_state, done = self.prepare_batch(batch_size)
 
         return self.update_sac(state, action, reward, next_state, done,
                                normalize_rewards, reward_scale,
                                adaptive_entropy, target_entropy,
                                clip_gradient, gamma, soft_tau, epsilon)
+
+    def prepare_batch(self, batch_size):
+        # size: (batch_size, item_size)
+        observation, action, reward, next_observation, done \
+            = tuple(map(lambda tensor: torch.FloatTensor(tensor).to(self.model_device),
+                        self.replay_buffer.sample(batch_size)))
+
+        state = self.state_encoder(observation)
+        with torch.no_grad():
+            next_state = self.state_encoder(next_observation)
+
+        # size: (batch_size, item_size)
+        return state, action, reward, next_state, done
 
     def load_model(self, path):
         super().load_model(path=path)
