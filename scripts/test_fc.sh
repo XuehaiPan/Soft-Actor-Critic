@@ -28,4 +28,4 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--log-dir "$LOG_DIR" \
 	--checkpoint-dir "$CHECKPOINT_DIR" \
 	--load-checkpoint \
-	"$@" # script arguments (can override above args)
+	"$@" # script arguments (can override args above)
