@@ -111,10 +111,6 @@ class ModelBase(object):
         print('Modules:', self.modules, file=file)
 
     @property
-    def env(self):
-        return self.collector.env
-
-    @property
     def replay_buffer(self):
         return self.collector.replay_buffer
 
