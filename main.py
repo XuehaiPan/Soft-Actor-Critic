@@ -103,7 +103,9 @@ def get_config():
     parser.add_argument('--buffer-capacity', type=int, default=1000000, metavar='CAPACITY',
                         help='capacity of replay buffer (default: 1000000)')
     parser.add_argument('--update-sample-ratio', type=float, default=2.0, metavar='RATIO',
-                        help='speed ratio of training and sampling (default: 2.0)')
+                        help='speed ratio of training and sampling '
+                             '(sample speed <= training speed / ratio (ratio should be larger than 1.0)) '
+                             '(default: 2.0)')
     parser.add_argument('--gamma', type=float, default=0.99,
                         help='discount factor for rewards (default: 0.99)')
     parser.add_argument('--soft-tau', type=float, default=0.01, metavar='TAU',

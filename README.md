@@ -122,7 +122,9 @@ optional arguments:
   --buffer-capacity CAPACITY
                         capacity of replay buffer (default: 1000000)
   --update-sample-ratio RATIO
-                        speed ratio of training and sampling (default: 2.0)
+                        speed ratio of training and sampling (sample speed <=
+                        training speed / ratio (ratio should be larger than
+                        1.0)) (default: 2.0)
   --gamma GAMMA         discount factor for rewards (default: 0.99)
   --soft-tau TAU        soft update factor for target networks (default: 0.01)
   --normalize-rewards   normalize rewards for training
