@@ -20,7 +20,7 @@ __all__ = ['Collector', 'TrajectoryCollector']
 class Sampler(mp.Process):
     def __init__(self, rank, n_samplers, lock,
                  running_event, event, next_sampler_event,
-                 env_func, env_kwargs, state_encoder, policy_net,
+                 env_func, env_kwargs, state_encoder, actor,
                  eval_only, replay_buffer,
                  n_total_steps, episode_steps, episode_rewards,
                  n_episodes, max_episode_steps,
@@ -41,7 +41,7 @@ class Sampler(mp.Process):
         self.random_seed = random_seed
 
         self.shared_state_encoder = state_encoder
-        self.shared_policy_net = policy_net
+        self.shared_actor = actor
         self.device = device
         self.eval_only = eval_only
 
@@ -76,11 +76,11 @@ class Sampler(mp.Process):
 
         if not self.random_sample:
             state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-            policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+            actor = clone_network(src_net=self.shared_actor, device=self.device)
             state_encoder.eval()
-            policy_net.eval()
+            actor.eval()
         else:
-            state_encoder = policy_net = None
+            state_encoder = actor = None
 
         self.episode = 0
         while self.episode < self.n_episodes:
@@ -88,7 +88,7 @@ class Sampler(mp.Process):
 
             if not (self.eval_only or self.random_sample):
                 sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-                sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
+                sync_params(src_net=self.shared_actor, dst_net=actor)
 
             episode_reward = 0
             episode_steps = 0
@@ -102,7 +102,7 @@ class Sampler(mp.Process):
                     action = self.env.action_space.sample()
                 else:
                     state = state_encoder.encode(observation)
-                    action = policy_net.get_action(state, deterministic=self.deterministic)
+                    action = actor.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
                 self.save_frame()
@@ -188,9 +188,9 @@ class TrajectorySampler(Sampler):
         self.env.seed(self.random_seed)
 
         state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-        policy_net = clone_network(src_net=self.shared_policy_net, device=self.device)
+        actor = clone_network(src_net=self.shared_actor, device=self.device)
         state_encoder.eval()
-        policy_net.eval()
+        actor.eval()
 
         self.episode = 0
         while self.episode < self.n_episodes:
@@ -198,7 +198,7 @@ class TrajectorySampler(Sampler):
 
             if not (self.eval_only or self.random_sample):
                 sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-                sync_params(src_net=self.shared_policy_net, dst_net=policy_net)
+                sync_params(src_net=self.shared_actor, dst_net=actor)
 
             episode_reward = 0
             episode_steps = 0
@@ -216,7 +216,7 @@ class TrajectorySampler(Sampler):
                     action = self.env.action_space.sample()
                 else:
                     state, hidden = state_encoder.encode(observation, hidden=hidden)
-                    action = policy_net.get_action(state, deterministic=self.deterministic)
+                    action = actor.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
                 self.render()
                 self.save_frame()
@@ -255,7 +255,7 @@ class TrajectorySampler(Sampler):
 
 
 class CollectorBase(object):
-    def __init__(self, env_func, env_kwargs, state_encoder, policy_net,
+    def __init__(self, env_func, env_kwargs, state_encoder, actor,
                  n_samplers, sampler, replay_buffer, buffer_capacity,
                  devices, random_seed):
         self.manager = mp.Manager()
@@ -267,7 +267,7 @@ class CollectorBase(object):
         self.lock = self.manager.Lock()
 
         self.state_encoder = state_encoder
-        self.policy_net = policy_net
+        self.actor = actor
         self.eval_only = False
 
         self.n_samplers = n_samplers
@@ -301,7 +301,7 @@ class CollectorBase(object):
         for rank in range(self.n_samplers):
             sampler = self.sampler(rank, self.n_samplers, self.lock,
                                    self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
-                                   self.env_func, self.env_kwargs, self.state_encoder, self.policy_net,
+                                   self.env_func, self.env_kwargs, self.state_encoder, self.actor,
                                    self.eval_only, self.replay_buffer,
                                    self.total_steps, self.episode_steps, self.episode_rewards,
                                    n_episodes, max_episode_steps,
@@ -349,10 +349,10 @@ class CollectorBase(object):
 
 
 class Collector(CollectorBase):
-    def __init__(self, env_func, env_kwargs, state_encoder, policy_net,
+    def __init__(self, env_func, env_kwargs, state_encoder, actor,
                  n_samplers, buffer_capacity, devices, random_seed):
         super().__init__(env_func, env_kwargs,
-                         state_encoder, policy_net,
+                         state_encoder, actor,
                          n_samplers, Sampler,
                          ReplayBuffer, buffer_capacity,
                          devices, random_seed)
@@ -360,10 +360,10 @@ class Collector(CollectorBase):
 
 class TrajectoryCollector(CollectorBase):
     def __init__(self, env_func, env_kwargs, state_encoder,
-                 policy_net, n_samplers, buffer_capacity,
+                 actor, n_samplers, buffer_capacity,
                  devices, random_seed):
         super().__init__(env_func, env_kwargs,
-                         state_encoder, policy_net,
+                         state_encoder, actor,
                          n_samplers, TrajectorySampler,
                          TrajectoryReplayBuffer, buffer_capacity,
                          devices, random_seed)

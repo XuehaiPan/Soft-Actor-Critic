@@ -118,13 +118,13 @@ def get_config():
     lr_group = parser.add_argument_group('learning rate')
     lr_group.add_argument('--lr', type=float, default=1E-4,
                           help='learning rate (can be override by the following specific learning rate) (default: 0.0001)')
-    lr_group.add_argument('--soft-q-lr', type=float, default=None,
-                          help='learning rate for Soft Q Networks (use LR above if not present)')
-    lr_group.add_argument('--policy-lr', type=float, default=None,
-                          help='learning rate for Policy Networks (use LR above if not present)')
+    lr_group.add_argument('--critic-lr', type=float, default=None,
+                          help='learning rate for critic networks (use LR above if not present)')
+    lr_group.add_argument('--actor-lr', type=float, default=None,
+                          help='learning rate for actor networks (use LR above if not present)')
     alpha_group = parser.add_argument_group('temperature parameter')
     alpha_group.add_argument('--alpha-lr', type=float, default=None,
-                             help='learning rate for temperature parameter (use POLICY_LR above if not present)')
+                             help='learning rate for temperature parameter (use ACTOR_LR above if not present)')
     alpha_group.add_argument('--initial-alpha', type=float, default=1.0, metavar='ALPHA',
                              help='initial value of temperature parameter (default: 1.0)')
     alpha_group.add_argument('--adaptive-entropy', action='store_true',
@@ -190,9 +190,9 @@ def initialize_hyperparameters(config):
     if config.RNN_encoder:
         config.n_samples_per_update *= config.step_size
 
-    config.soft_q_lr = (config.soft_q_lr or config.lr)
-    config.policy_lr = (config.policy_lr or config.lr)
-    config.alpha_lr = (config.alpha_lr or config.policy_lr)
+    config.critic_lr = (config.critic_lr or config.lr)
+    config.actor_lr = (config.actor_lr or config.lr)
+    config.alpha_lr = (config.alpha_lr or config.actor_lr)
 
 
 def main():

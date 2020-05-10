@@ -24,7 +24,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--n-samplers 4 \
 	--buffer-capacity 1000000 \
 	--update-sample-ratio 2.0 \
-	--soft-q-lr 1E-3 --policy-lr 1E-4 \
+	--critic-lr 1E-3 --actor-lr 1E-4 \
 	--alpha-lr 1E-3 --initial-alpha 1.0 --adaptive-entropy \
 	--gamma 0.99 --soft-tau 0.01 \
 	--normalize-rewards --reward-scale 1.0 \

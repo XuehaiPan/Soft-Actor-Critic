@@ -33,7 +33,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--n-samplers 4 \
 	--buffer-capacity 100000 \
 	--update-sample-ratio 2.0 \
-	--soft-q-lr 1E-4 --policy-lr 1E-5 \
+	--critic-lr 1E-4 --actor-lr 1E-5 \
 	--alpha-lr 1E-5 --initial-alpha 1.0 --adaptive-entropy \
 	--gamma 0.99 --soft-tau 0.01 \
 	--normalize-rewards --reward-scale 1.0 \

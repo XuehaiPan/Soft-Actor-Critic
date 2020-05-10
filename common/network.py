@@ -57,10 +57,14 @@ def build_encoder(config):
 
 
 class NetworkBase(nn.Module):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, modules=None, device=DEVICE_CPU):
         super().__init__()
+        self.device = device
 
-        self.device = None
+        if modules is not None:
+            self.modules = modules
+
+        self.to(device)
 
     def save_model(self, path):
         torch.save(self.state_dict(), path)

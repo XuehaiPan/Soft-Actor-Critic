@@ -4,6 +4,7 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
 from common.collector import Collector
@@ -28,8 +29,8 @@ def build_model(config):
                                            'devices',
                                            'random_seed'])
     if config.mode == 'train':
-        model_kwargs.update(config.build_from_keys(['soft_q_lr',
-                                                    'policy_lr',
+        model_kwargs.update(config.build_from_keys(['critic_lr',
+                                                    'actor_lr',
                                                     'alpha_lr',
                                                     'weight_decay']))
 
@@ -70,30 +71,31 @@ class ModelBase(object):
 
         self.state_encoder = state_encoder_wrapper(state_encoder, device=self.model_device)
 
-        self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims,
-                                         activation=activation, device=self.model_device)
-        self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims,
-                                         activation=activation, device=self.model_device)
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dims,
-                                        activation=activation, device=self.model_device)
+        soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims,
+                                    activation=activation, device=self.model_device)
+        soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims,
+                                    activation=activation, device=self.model_device)
+        self.critic = nn.ModuleDict([('soft_q_net_1', soft_q_net_1),
+                                     ('soft_q_net_2', soft_q_net_2)])
+        self.actor = PolicyNetwork(state_dim, action_dim, hidden_dims,
+                                   activation=activation, device=self.model_device)
 
         self.log_alpha = nn.Parameter(torch.tensor([[np.log(initial_alpha)]], dtype=torch.float32, device=self.model_device),
                                       requires_grad=True)
 
         self.modules = nn.ModuleDict([
             ('state_encoder', self.state_encoder),
-            ('soft_q_net_1', self.soft_q_net_1),
-            ('soft_q_net_2', self.soft_q_net_2),
-            ('policy_net', self.policy_net),
+            ('critic', self.critic),
+            ('actor', self.actor),
             ('params', nn.ParameterDict({'log_alpha': self.log_alpha}))
         ])
 
         self.state_encoder.share_memory()
-        self.policy_net.share_memory()
+        self.actor.share_memory()
         self.collector = collector(env_func=env_func,
                                    env_kwargs=env_kwargs,
                                    state_encoder=self.state_encoder,
-                                   policy_net=self.policy_net,
+                                   actor=self.actor,
                                    n_samplers=n_samplers,
                                    buffer_capacity=buffer_capacity,
                                    devices=self.devices,
@@ -148,34 +150,30 @@ class ModelBase(object):
 class TrainerBase(ModelBase):
     def __init__(self, env_func, env_kwargs, state_encoder, state_encoder_wrapper,
                  state_dim, action_dim, hidden_dims, activation,
-                 initial_alpha, soft_q_lr, policy_lr, alpha_lr, weight_decay,
+                 initial_alpha, critic_lr, actor_lr, alpha_lr, weight_decay,
                  n_samplers, collector, buffer_capacity, devices, random_seed=0):
         super().__init__(env_func, env_kwargs, state_encoder, state_encoder_wrapper,
                          state_dim, action_dim, hidden_dims, activation,
                          initial_alpha, n_samplers, collector, buffer_capacity,
                          devices, random_seed)
 
-        self.target_soft_q_net_1 = clone_network(src_net=self.soft_q_net_1, device=self.model_device)
-        self.target_soft_q_net_2 = clone_network(src_net=self.soft_q_net_2, device=self.model_device)
-        self.target_soft_q_net_1.eval()
-        self.target_soft_q_net_2.eval()
+        self.target_critic = clone_network(src_net=self.critic, device=self.model_device)
+        self.target_critic.eval()
 
-        self.soft_q_criterion_1 = nn.MSELoss()
-        self.soft_q_criterion_2 = nn.MSELoss()
+        self.critic_criterion = F.mse_loss
 
         self.global_step = 0
 
         self.optimizer = optim.Adam(itertools.chain(self.state_encoder.parameters(),
-                                                    self.soft_q_net_1.parameters(),
-                                                    self.soft_q_net_2.parameters(),
-                                                    self.policy_net.parameters()),
-                                    lr=soft_q_lr, weight_decay=weight_decay)
+                                                    self.critic.parameters(),
+                                                    self.actor.parameters()),
+                                    lr=critic_lr, weight_decay=weight_decay)
         for param_group in self.optimizer.param_groups:
             n_params = 0
             for param in param_group['params']:
                 n_params += param.size().numel()
             param_group['n_params'] = n_params
-        self.policy_loss_weight = policy_lr / soft_q_lr
+        self.actor_loss_weight = actor_lr / critic_lr
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
         self.train(mode=True)
@@ -190,7 +188,7 @@ class TrainerBase(ModelBase):
                 reward = reward_scale * (reward - reward.mean()) / (reward.std() + epsilon)
 
         # Update temperature parameter
-        new_action, log_prob = self.policy_net.evaluate(state)
+        new_action, log_prob = self.actor.evaluate(state)
         if adaptive_entropy is True:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
@@ -200,28 +198,28 @@ class TrainerBase(ModelBase):
             alpha = self.log_alpha.exp()
 
         # Train Q function
-        predicted_q_value_1 = self.soft_q_net_1(state, action)
-        predicted_q_value_2 = self.soft_q_net_2(state, action)
+        predicted_q_value_1 = self.critic['soft_q_net_1'](state, action)
+        predicted_q_value_2 = self.critic['soft_q_net_2'](state, action)
         with torch.no_grad():
-            new_next_action, next_log_prob = self.policy_net.evaluate(next_state)
+            new_next_action, next_log_prob = self.actor.evaluate(next_state)
 
-            target_q_min = torch.min(self.target_soft_q_net_1(next_state, new_next_action),
-                                     self.target_soft_q_net_2(next_state, new_next_action))
+            target_q_min = torch.min(self.target_critic['soft_q_net_1'](next_state, new_next_action),
+                                     self.target_critic['soft_q_net_2'](next_state, new_next_action))
             target_q_min -= alpha * next_log_prob
             target_q_value = reward + (1 - done) * gamma * target_q_min
-        soft_q_loss_1 = self.soft_q_criterion_1(predicted_q_value_1, target_q_value)
-        soft_q_loss_2 = self.soft_q_criterion_2(predicted_q_value_2, target_q_value)
-        soft_q_loss = (soft_q_loss_1 + soft_q_loss_2) / 2.0
+        critic_loss_1 = self.critic_criterion(predicted_q_value_1, target_q_value)
+        critic_loss_2 = self.critic_criterion(predicted_q_value_2, target_q_value)
+        critic_loss = (critic_loss_1 + critic_loss_2) / 2.0
 
         # Train policy function
-        predicted_new_q_value = torch.min(self.soft_q_net_1(state, new_action),
-                                          self.soft_q_net_2(state, new_action))
-        predicted_new_q_value_soft_q_grad_only = torch.min(self.soft_q_net_1(state, new_action.detach()),
-                                                           self.soft_q_net_2(state, new_action.detach()))
-        policy_loss = (alpha * log_prob - predicted_new_q_value).mean()
-        policy_loss_unbiased = policy_loss + predicted_new_q_value_soft_q_grad_only.mean()
+        predicted_new_q_value = torch.min(self.critic['soft_q_net_1'](state, new_action),
+                                          self.critic['soft_q_net_2'](state, new_action))
+        predicted_new_q_value_critic_grad_only = torch.min(self.critic['soft_q_net_1'](state, new_action.detach()),
+                                                           self.critic['soft_q_net_2'](state, new_action.detach()))
+        actor_loss = (alpha * log_prob - predicted_new_q_value).mean()
+        actor_loss_unbiased = actor_loss + predicted_new_q_value_critic_grad_only.mean()
 
-        loss = soft_q_loss + self.policy_loss_weight * policy_loss_unbiased
+        loss = critic_loss + self.actor_loss_weight * actor_loss_unbiased
         self.optimizer.zero_grad()
         loss.backward()
         if clip_gradient:
@@ -232,13 +230,12 @@ class TrainerBase(ModelBase):
         self.optimizer.step()
 
         # Soft update the target value net
-        sync_params(src_net=self.soft_q_net_1, dst_net=self.target_soft_q_net_1, soft_tau=soft_tau)
-        sync_params(src_net=self.soft_q_net_2, dst_net=self.target_soft_q_net_2, soft_tau=soft_tau)
+        sync_params(src_net=self.critic, dst_net=self.target_critic, soft_tau=soft_tau)
 
         self.global_step += 1
 
         info = {}
-        return soft_q_loss.item(), policy_loss.item(), alpha.item(), info
+        return critic_loss.item(), actor_loss.item(), alpha.item(), info
 
     def update(self, batch_size, normalize_rewards=True, reward_scale=1.0,
                adaptive_entropy=True, target_entropy=-2.0,
@@ -260,10 +257,8 @@ class TrainerBase(ModelBase):
 
     def load_model(self, path):
         super().load_model(path=path)
-        self.target_soft_q_net_1.load_state_dict(self.soft_q_net_1.state_dict())
-        self.target_soft_q_net_2.load_state_dict(self.soft_q_net_2.state_dict())
-        self.target_soft_q_net_1.eval()
-        self.target_soft_q_net_2.eval()
+        self.target_critic.load_state_dict(self.critic.state_dict())
+        self.target_critic.eval()
 
 
 class Trainer(TrainerBase):

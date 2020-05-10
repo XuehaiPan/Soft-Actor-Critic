@@ -82,7 +82,7 @@ usage: main.py [-h] [--mode {train,test}]
                [--n-samplers N_SAMPLERS] [--buffer-capacity CAPACITY]
                [--update-sample-ratio RATIO] [--gamma GAMMA] [--soft-tau TAU]
                [--normalize-rewards] [--reward-scale SCALE] [--deterministic]
-               [--lr LR] [--soft-q-lr SOFT_Q_LR] [--policy-lr POLICY_LR]
+               [--lr LR] [--critic-lr CRITIC_LR] [--actor-lr ACTOR_LR]
                [--alpha-lr ALPHA_LR] [--initial-alpha ALPHA]
                [--adaptive-entropy] [--weight-decay WEIGHT_DECAY]
                [--clip-gradient] [--random-seed SEED] [--log-episode-video]
@@ -183,15 +183,14 @@ CNN state encoder:
 learning rate:
   --lr LR               learning rate (can be override by the following
                         specific learning rate) (default: 0.0001)
-  --soft-q-lr SOFT_Q_LR
-                        learning rate for Soft Q Networks (use LR above if not
+  --critic-lr CRITIC_LR
+                        learning rate for critic networks (use LR above if not
                         present)
-  --policy-lr POLICY_LR
-                        learning rate for Policy Networks (use LR above if not
+  --actor-lr ACTOR_LR   learning rate for actor networks (use LR above if not
                         present)
 
 temperature parameter:
-  --alpha-lr ALPHA_LR   learning rate for temperature parameter (use POLICY_LR
+  --alpha-lr ALPHA_LR   learning rate for temperature parameter (use ACTOR_LR
                         above if not present)
   --initial-alpha ALPHA
                         initial value of temperature parameter (default: 1.0)
