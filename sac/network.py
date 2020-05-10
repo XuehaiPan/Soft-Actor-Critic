@@ -1,3 +1,5 @@
+import itertools
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -46,8 +48,13 @@ class DimensionScaler(NetworkBase):
         self.output_dim = output_dim
 
         self.scaler = nn.Linear(in_features=input_dim, out_features=output_dim, bias=True)
-        nn.init.eye_(self.scaler.weight)
+        nn.init.zeros_(self.scaler.weight)
         nn.init.zeros_(self.scaler.bias)
+        with torch.no_grad():
+            for _, i, o in zip(range(max(input_dim, output_dim)),
+                               itertools.cycle(range(input_dim)),
+                               itertools.cycle(range(output_dim))):
+                self.scaler.weight[o, i] = 1.0
 
         self.to(device)
 
