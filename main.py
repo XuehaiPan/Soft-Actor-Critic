@@ -84,6 +84,8 @@ def get_config():
                                    help='strides of conv layers in CNN state encoder (defaults: 1)')
     cnn_encoder_group.add_argument('--paddings', type=int, default=[], nargs='+', metavar='P',
                                    help='paddings of conv layers in CNN state encoder (defaults: K // 2)')
+    cnn_encoder_group.add_argument('--poolings', type=int, default=[], nargs='+', metavar='K',
+                                   help='max pooling kernel size after activation function in CNN state encoder (defaults: 1)')
     cnn_encoder_group.add_argument('--batch-normalization', action='store_true', default=False,
                                    help='use batch normalization in CNN state encoder')
     parser.add_argument('--max-episode-steps', type=int, default=10000,
@@ -172,12 +174,15 @@ def initialize_hyperparameters(config):
         kernel_sizes = config.kernel_sizes
         strides = config.strides
         paddings = config.paddings
+        poolings = config.poolings
         while len(kernel_sizes) < len(config.encoder_hidden_channels):
             kernel_sizes.append(3)
         while len(strides) < len(kernel_sizes):
             strides.append(1)
         while len(paddings) < len(kernel_sizes):
             paddings.append(kernel_sizes[len(paddings)] // 2)
+        while len(poolings) < len(kernel_sizes):
+            poolings.append(1)
 
     config.n_samples_per_update = config.batch_size
     if config.RNN_encoder:

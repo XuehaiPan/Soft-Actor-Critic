@@ -75,14 +75,14 @@ usage: main.py [-h] [--mode {train,test}]
                [--skip-connection] [--step-size STEP_SIZE]
                [--encoder-hidden-channels CHN [CHN ...]]
                [--kernel-sizes K [K ...]] [--strides S [S ...]]
-               [--paddings P [P ...]] [--batch-normalization]
-               [--max-episode-steps MAX_EPISODE_STEPS] [--n-epochs N_EPOCHS]
-               [--n-episodes N_EPISODES] [--n-updates N_UPDATES]
-               [--batch-size BATCH_SIZE] [--n-samplers N_SAMPLERS]
-               [--buffer-capacity CAPACITY] [--update-sample-ratio RATIO]
-               [--gamma GAMMA] [--soft-tau TAU] [--normalize-rewards]
-               [--reward-scale SCALE] [--deterministic] [--lr LR]
-               [--soft-q-lr SOFT_Q_LR] [--policy-lr POLICY_LR]
+               [--paddings P [P ...]] [--poolings K [K ...]]
+               [--batch-normalization] [--max-episode-steps MAX_EPISODE_STEPS]
+               [--n-epochs N_EPOCHS] [--n-episodes N_EPISODES]
+               [--n-updates N_UPDATES] [--batch-size BATCH_SIZE]
+               [--n-samplers N_SAMPLERS] [--buffer-capacity CAPACITY]
+               [--update-sample-ratio RATIO] [--gamma GAMMA] [--soft-tau TAU]
+               [--normalize-rewards] [--reward-scale SCALE] [--deterministic]
+               [--lr LR] [--soft-q-lr SOFT_Q_LR] [--policy-lr POLICY_LR]
                [--alpha-lr ALPHA_LR] [--initial-alpha ALPHA]
                [--adaptive-entropy] [--weight-decay WEIGHT_DECAY]
                [--clip-gradient] [--random-seed SEED] [--log-episode-video]
@@ -173,6 +173,8 @@ CNN state encoder:
                         1)
   --paddings P [P ...]  paddings of conv layers in CNN state encoder
                         (defaults: K // 2)
+  --poolings K [K ...]  max pooling kernel size after activation function in
+                        CNN state encoder (defaults: 1)
   --batch-normalization
                         use batch normalization in CNN state encoder
 

@@ -23,10 +23,10 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--activation LeakyReLU \
 	--encoder-arch CNN \
 	--state-dim 128 \
-	--encoder-hidden-channels 64 64 64 \
-	--kernel-sizes 3 3 3 \
-	--strides 1 1 1 \
-	--paddings 1 1 1 \
+	--encoder-hidden-channels 64 64 64 64 \
+	--kernel-sizes 5 5 3 3 \
+	--strides 2 2 1 1 \
+	--paddings 2 2 1 1 \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \

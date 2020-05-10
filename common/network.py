@@ -38,14 +38,16 @@ def build_encoder(config):
                                                activation=config.activation,
                                                output_activation=None)
     elif config.CNN_encoder:
-        state_encoder = ConvolutionalNeuralNetwork(input_channels=config.observation_dim,
+        state_encoder = ConvolutionalNeuralNetwork(image_size=(config.image_size, config.image_size),
+                                                   input_channels=config.observation_dim,
                                                    output_dim=config.state_dim,
                                                    n_hidden_channels=config.encoder_hidden_channels,
-                                                   batch_normalization=False,
                                                    output_activation=None,
                                                    **config.build_from_keys(['kernel_sizes',
                                                                              'strides',
                                                                              'paddings',
+                                                                             'poolings',
+                                                                             'batch_normalization',
                                                                              'activation']))
 
     config.state_encoder = state_encoder
@@ -226,9 +228,9 @@ class RecurrentNeuralNetwork(NetworkBase):
 
 
 class ConvolutionalNeuralNetwork(NetworkBase):
-    def __init__(self, input_channels, output_dim,
+    def __init__(self, image_size, input_channels, output_dim,
                  n_hidden_channels, kernel_sizes, strides, paddings,
-                 batch_normalization, activation=F.relu,
+                 poolings, batch_normalization, activation=F.relu,
                  output_activation=None, device=DEVICE_CPU):
         assert len(n_hidden_channels) == len(kernel_sizes)
         assert len(n_hidden_channels) == len(strides)
@@ -237,22 +239,21 @@ class ConvolutionalNeuralNetwork(NetworkBase):
         super().__init__()
         self.device = device
 
-        n_hidden_channels = [input_channels, *n_hidden_channels, output_dim]
-        kernel_sizes = [*kernel_sizes, 1]
-        strides = [*strides, 1]
-        paddings = [*paddings, 0]
+        n_hidden_channels = [input_channels, *n_hidden_channels]
 
         self.activation = activation
         self.output_activation = output_activation
 
         self.conv_layers = nn.ModuleList()
         for i in range(len(n_hidden_channels) - 1):
-            self.conv_layers.append(module=nn.Conv2d(n_hidden_channels[i],
-                                                     n_hidden_channels[i + 1],
-                                                     kernel_size=kernel_sizes[i],
-                                                     stride=strides[i],
-                                                     padding=paddings[i],
-                                                     bias=True))
+            conv_layer = nn.Conv2d(n_hidden_channels[i],
+                                   n_hidden_channels[i + 1],
+                                   kernel_size=kernel_sizes[i],
+                                   stride=strides[i],
+                                   padding=paddings[i],
+                                   bias=True)
+
+            self.conv_layers.append(module=conv_layer)
 
         self.batch_normalization = batch_normalization
         if batch_normalization:
@@ -261,7 +262,17 @@ class ConvolutionalNeuralNetwork(NetworkBase):
                 self.batch_norm_layers.append(module=nn.BatchNorm2d(n_hidden_channels[i],
                                                                     affine=True))
 
-        self.global_average_pooling_layer = nn.AdaptiveAvgPool2d((1, 1))
+        self.max_pooling_layers = nn.ModuleList(list(map(nn.MaxPool2d, poolings)))
+
+        dummy = torch.zeros(1, input_channels, *image_size)
+        with torch.no_grad():
+            for conv_layer, max_pooling_layer in zip(self.conv_layers, self.max_pooling_layers):
+                dummy = conv_layer(dummy)
+                dummy = max_pooling_layer(dummy)
+        conv_output_dim = np.prod(dummy.size())
+        self.linear_layer = nn.Linear(in_features=conv_output_dim,
+                                      out_features=output_dim,
+                                      bias=True)
 
         self.to(device)
 
@@ -269,20 +280,19 @@ class ConvolutionalNeuralNetwork(NetworkBase):
         input_size = x.size()
         x = x.view(np.prod(input_size[:-3]), *input_size[-3:])
 
-        n_layers = len(self.conv_layers)
-        for i, conv_layer in enumerate(self.conv_layers):
+        for i, (conv_layer, max_pooling_layer) in enumerate(zip(self.conv_layers,
+                                                                self.max_pooling_layers)):
             x = conv_layer(x)
             if self.batch_normalization:
                 x = self.batch_norm_layers[i](x)
-            if i < n_layers - 1:
-                x = self.activation(x)
+            x = self.activation(x)
+            x = max_pooling_layer(x)
 
-        x = self.global_average_pooling_layer(x)
-        x = x.view(x.size()[:-2])
+        x = x.view(*input_size[:-3], -1)
+        x = self.linear_layer(x)
         if self.output_activation is not None:
             x = self.output_activation(x)
 
-        x = x.view(*input_size[:-3], -1)
         return x
 
 
