@@ -101,7 +101,7 @@ def train(model, config):
         model.sample(n_episodes=10,
                      max_episode_steps=config.max_episode_steps,
                      deterministic=False,
-                     random_sample=(not config.RNN_encoder),
+                     random_sample=True,
                      render=config.render)
 
     model.collector.train()

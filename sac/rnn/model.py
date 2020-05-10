@@ -61,8 +61,8 @@ class Trainer(TrainerBase):
                           for item in episode])
 
         # size: (step_size, batch_size, item_size)
-        observation, action, reward, next_observation, done = tuple(map(lambda tensors: torch.stack(tensors, dim=1),
-                                                                        zip(*batch)))
+        observation, action, reward, next_observation, done \
+            = tuple(map(lambda tensors: torch.stack(tensors, dim=1), zip(*batch)))
         hidden = cat_hidden(hiddens, dim=1)
 
         # size: (step_size, batch_size, item_size)

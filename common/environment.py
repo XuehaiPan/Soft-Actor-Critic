@@ -4,10 +4,11 @@ import gym
 import numpy as np
 import torchvision.transforms as transforms
 from gym.spaces import Box
+from gym.wrappers import TimeLimit
 
 
 __all__ = [
-    'initialize_environment', 'build_env',
+    'build_env', 'initialize_environment',
     'FlattenedAction', 'NormalizedAction',
     'FlattenedObservation', 'VisionObservation', 'ConcatenatedObservation'
 ]
@@ -21,6 +22,30 @@ try:
     import mujoco_py
 except Exception:
     pass
+
+
+def build_env(**kwargs):
+    env = gym.make(kwargs['name'])
+    env.seed(kwargs['random_seed'])
+
+    env = NormalizedAction(FlattenedAction(env))
+    if kwargs['vision_observation']:
+        env = VisionObservation(env, image_size=(kwargs['image_size'], kwargs['image_size']))
+    else:
+        env = FlattenedObservation(env)
+    if kwargs['n_frames'] > 1:
+        env = ConcatenatedObservation(env, n_frames=kwargs['n_frames'], dim=0)
+
+    max_episode_steps = kwargs['max_episode_steps']
+    try:
+        max_episode_steps = min(max_episode_steps, env.spec.max_episode_steps)
+    except AttributeError:
+        pass
+    except TypeError:
+        pass
+    env = TimeLimit(env, max_episode_steps=max_episode_steps)
+
+    return env
 
 
 def initialize_environment(config):
@@ -46,21 +71,6 @@ def initialize_environment(config):
         except TypeError:
             pass
         config.env_kwargs['max_episode_steps'] = config.max_episode_steps
-
-
-def build_env(**kwargs):
-    env = gym.make(kwargs['name'])
-    env.seed(kwargs['random_seed'])
-
-    env = NormalizedAction(FlattenedAction(env))
-    if kwargs['vision_observation']:
-        env = VisionObservation(env, image_size=(kwargs['image_size'], kwargs['image_size']))
-    else:
-        env = FlattenedObservation(env)
-    if kwargs['n_frames'] > 1:
-        env = ConcatenatedObservation(env, n_frames=kwargs['n_frames'], dim=0)
-
-    return env
 
 
 class FlattenedAction(gym.ActionWrapper):

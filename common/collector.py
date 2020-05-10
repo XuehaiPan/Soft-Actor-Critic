@@ -186,10 +186,13 @@ class EpisodeSampler(Sampler):
         self.env = self.env_func(**self.env_kwargs)
         self.env.seed(self.random_seed)
 
-        state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-        actor = clone_network(src_net=self.shared_actor, device=self.device)
-        state_encoder.eval()
-        actor.eval()
+        if not self.random_sample:
+            state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+            actor = clone_network(src_net=self.shared_actor, device=self.device)
+            state_encoder.eval()
+            actor.eval()
+        else:
+            state_encoder = actor = None
 
         self.episode = 0
         while self.episode < self.n_episodes:
@@ -202,15 +205,12 @@ class EpisodeSampler(Sampler):
             episode_reward = 0
             episode_steps = 0
             trajectory = []
-            hiddens = []
             hidden = None
             observation = self.env.reset()
             self.frames.clear()
             self.render()
             self.save_frame()
             for step in range(self.max_episode_steps):
-                hiddens.append(hidden)
-
                 if self.random_sample:
                     action = self.env.action_space.sample()
                 else:
