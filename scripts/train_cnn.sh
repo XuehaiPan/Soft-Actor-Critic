@@ -33,7 +33,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--n-epochs 1000 --n-updates 256 --batch-size 128 \
 	--n-samplers 4 \
 	--buffer-capacity 100000 \
-	--update-sample-ratio 2.0 \
+	--update-sample-ratio 8.0 \
 	--critic-lr 1E-4 --actor-lr 1E-5 \
 	--alpha-lr 1E-5 --initial-alpha 1.0 --adaptive-entropy \
 	--gamma 0.99 --soft-tau 0.01 \
