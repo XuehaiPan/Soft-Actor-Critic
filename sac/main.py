@@ -20,7 +20,7 @@ def train_loop(model, config, update_kwargs):
             epoch_critic_loss = 0.0
             epoch_actor_loss = 0.0
             epoch_alpha = 0.0
-            mean_episode_rewards = 0.0
+            mean_episode_reward = 0.0
             mean_episode_steps = 0.0
             with tqdm.trange(config.n_updates, desc=f'Training {epoch}/{config.n_epochs}') as pbar:
                 for i in pbar:
@@ -35,7 +35,7 @@ def train_loop(model, config, update_kwargs):
                     except ZeroDivisionError:
                         update_sample_ratio = config.update_sample_ratio
                     recent_slice = slice(max(n_episodes - 100, n_initial_episodes + 1), n_episodes)
-                    mean_episode_rewards = np.mean(model.collector.episode_rewards[recent_slice])
+                    mean_episode_reward = np.mean(model.collector.episode_rewards[recent_slice])
                     mean_episode_steps = np.mean(model.collector.episode_steps[recent_slice])
                     epoch_critic_loss += (critic_loss - epoch_critic_loss) / (i + 1)
                     epoch_actor_loss += (actor_loss - epoch_actor_loss) / (i + 1)
@@ -46,7 +46,7 @@ def train_loop(model, config, update_kwargs):
                                       global_step=model.global_step)
                     writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha,
                                       global_step=model.global_step)
-                    writer.add_scalar(tag='train/mean_episode_rewards', scalar_value=mean_episode_rewards,
+                    writer.add_scalar(tag='train/mean_episode_reward', scalar_value=mean_episode_reward,
                                       global_step=model.global_step)
                     writer.add_scalar(tag='train/mean_episode_steps', scalar_value=mean_episode_steps,
                                       global_step=model.global_step)
@@ -55,7 +55,7 @@ def train_loop(model, config, update_kwargs):
                     writer.add_scalar(tag='train/update_sample_ratio', scalar_value=update_sample_ratio,
                                       global_step=model.global_step)
                     pbar.set_postfix(OrderedDict([('global_step', model.global_step),
-                                                  ('episode_rewards', mean_episode_rewards),
+                                                  ('episode_reward', mean_episode_reward),
                                                   ('episode_steps', mean_episode_steps),
                                                   ('n_samples', f'{n_samples:.2E}'),
                                                   ('update/sample', f'{update_sample_ratio:.1f}')]))
@@ -67,7 +67,7 @@ def train_loop(model, config, update_kwargs):
             writer.add_scalar(tag='epoch/critic_loss', scalar_value=epoch_critic_loss, global_step=epoch)
             writer.add_scalar(tag='epoch/actor_loss', scalar_value=epoch_actor_loss, global_step=epoch)
             writer.add_scalar(tag='epoch/temperature_parameter', scalar_value=epoch_alpha, global_step=epoch)
-            writer.add_scalar(tag='epoch/mean_episode_rewards', scalar_value=mean_episode_rewards, global_step=epoch)
+            writer.add_scalar(tag='epoch/mean_episode_reward', scalar_value=mean_episode_reward, global_step=epoch)
             writer.add_scalar(tag='epoch/mean_episode_steps', scalar_value=mean_episode_steps, global_step=epoch)
 
             writer.add_figure(tag='epoch/action_scaler_1',
@@ -80,7 +80,7 @@ def train_loop(model, config, update_kwargs):
             writer.flush()
             if epoch % 10 == 0:
                 model.save_model(path=os.path.join(config.checkpoint_dir,
-                                                   f'checkpoint-{epoch}-{mean_episode_rewards:+.2E}.pkl'))
+                                                   f'checkpoint-{epoch}-{mean_episode_reward:+.2E}.pkl'))
 
 
 def train(model, config):

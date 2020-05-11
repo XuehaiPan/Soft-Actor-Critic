@@ -85,7 +85,7 @@ class Trainer(TrainerBase):
                 offset = length - step_size
             self.episode_cache.appendleft((episode, length, offset, hidden.detach()))
 
-        # size: (step_size * batch_size, item_size)
+        # size: (batch_size * step_size, item_size)
         state, action, reward, next_state, done \
             = tuple(map(lambda x: x.view(batch_size * step_size, -1),
                         [state, action, reward, next_state, done]))
