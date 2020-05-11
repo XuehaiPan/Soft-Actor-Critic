@@ -9,7 +9,7 @@ import torch.optim as optim
 
 from common.collector import Collector
 from common.utils import clone_network, sync_params
-from sac.network import SoftQNetwork, PolicyNetwork, StateEncoderWrapper
+from sac.network import StateEncoderWrapper, Actor, Critic
 
 
 __all__ = ['build_model', 'ModelBase', 'TrainerBase', 'Trainer', 'Tester']
@@ -71,14 +71,10 @@ class ModelBase(object):
 
         self.state_encoder = state_encoder_wrapper(state_encoder, device=self.model_device)
 
-        soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims,
-                                    activation=activation, device=self.model_device)
-        soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims,
-                                    activation=activation, device=self.model_device)
-        self.critic = nn.ModuleDict([('soft_q_net_1', soft_q_net_1),
-                                     ('soft_q_net_2', soft_q_net_2)])
-        self.actor = PolicyNetwork(state_dim, action_dim, hidden_dims,
-                                   activation=activation, device=self.model_device)
+        self.critic = Critic(state_dim, action_dim, hidden_dims,
+                             activation=activation, device=self.model_device)
+        self.actor = Actor(state_dim, action_dim, hidden_dims,
+                           activation=activation, device=self.model_device)
 
         self.log_alpha = nn.Parameter(torch.tensor([[np.log(initial_alpha)]], dtype=torch.float32, device=self.model_device),
                                       requires_grad=True)
@@ -194,13 +190,11 @@ class TrainerBase(ModelBase):
             alpha = self.log_alpha.exp()
 
         # Train Q function
-        predicted_q_value_1 = self.critic['soft_q_net_1'](state, action)
-        predicted_q_value_2 = self.critic['soft_q_net_2'](state, action)
+        predicted_q_value_1, predicted_q_value_2 = self.critic(state, action)
         with torch.no_grad():
             new_next_action, next_log_prob, _ = self.actor.evaluate(next_state)
 
-            target_q_min = torch.min(self.target_critic['soft_q_net_1'](next_state, new_next_action),
-                                     self.target_critic['soft_q_net_2'](next_state, new_next_action))
+            target_q_min = torch.min(*self.target_critic(next_state, new_next_action))
             target_q_min -= alpha * next_log_prob
             target_q_value = reward + (1 - done) * gamma * target_q_min
         critic_loss_1 = self.critic_criterion(predicted_q_value_1, target_q_value)
@@ -208,10 +202,8 @@ class TrainerBase(ModelBase):
         critic_loss = (critic_loss_1 + critic_loss_2) / 2.0
 
         # Train policy function
-        predicted_new_q_value = torch.min(self.critic['soft_q_net_1'](state, new_action),
-                                          self.critic['soft_q_net_2'](state, new_action))
-        predicted_new_q_value_critic_grad_only = torch.min(self.critic['soft_q_net_1'](state, new_action.detach()),
-                                                           self.critic['soft_q_net_2'](state, new_action.detach()))
+        predicted_new_q_value = torch.min(*self.critic(state, new_action))
+        predicted_new_q_value_critic_grad_only = torch.min(*self.critic(state, new_action.detach()))
         actor_loss = (alpha * log_prob - predicted_new_q_value).mean()
         actor_loss_unbiased = actor_loss + predicted_new_q_value_critic_grad_only.mean()
 

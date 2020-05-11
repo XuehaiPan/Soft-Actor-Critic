@@ -71,10 +71,10 @@ def train_loop(model, config, update_kwargs):
             writer.add_scalar(tag='epoch/mean_episode_steps', scalar_value=mean_episode_steps, global_step=epoch)
 
             writer.add_figure(tag='epoch/action_scaler_1',
-                              figure=model.critic['soft_q_net_1'].action_scaler.plot(),
+                              figure=model.critic.soft_q_net_1.action_scaler.plot(),
                               global_step=epoch)
             writer.add_figure(tag='epoch/action_scaler_2',
-                              figure=model.critic['soft_q_net_2'].action_scaler.plot(),
+                              figure=model.critic.soft_q_net_2.action_scaler.plot(),
                               global_step=epoch)
 
             writer.flush()

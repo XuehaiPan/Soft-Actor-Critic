@@ -55,14 +55,9 @@ def build_encoder(config):
 
 
 class NetworkBase(nn.Module):
-    def __init__(self, modules=None, device=None):
+    def __init__(self):
         super().__init__()
-        self.device = device
-
-        if modules is not None:
-            self.modules = modules
-
-        self.to(device)
+        self.device = None
 
     def to(self, *args, **kwargs):
         device, dtype, non_blocking = torch._C._nn._parse_to(*args, **kwargs)

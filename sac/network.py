@@ -12,9 +12,11 @@ from common.network import NetworkBase, MultilayerPerceptron
 
 __all__ = [
     'StateEncoderWrapper',
-    'DimensionScaler', 'ValueNetwork', 'SoftQNetwork',
-    'PolicyNetwork'
+    'Actor', 'Critic'
 ]
+
+LOG_STD_MIN = np.log(1E-8)
+LOG_STD_MAX = np.log(20.0)
 
 
 class StateEncoderWrapper(NetworkBase):
@@ -130,6 +132,8 @@ class ValueNetwork(MultilayerPerceptron):
 
         self.state_dim = state_dim
 
+        self.to(device)
+
     def forward(self, state):
         return super().forward(state)
 
@@ -151,13 +155,15 @@ class SoftQNetwork(MultilayerPerceptron):
                                              output_dim=scaled_action_dim,
                                              device=device)
 
+        self.to(device)
+
     def forward(self, state, action):
         return super().forward(torch.cat([state, self.action_scaler(action)], dim=-1))
 
 
 class PolicyNetwork(MultilayerPerceptron):
     def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None,
-                 log_std_min=np.log(1E-8), log_std_max=np.log(20.0)):
+                 log_std_min=LOG_STD_MIN, log_std_max=LOG_STD_MAX):
         super().__init__(n_dims=[state_dim, *hidden_dims, 2 * action_dim],
                          activation=activation,
                          output_activation=None,
@@ -168,6 +174,8 @@ class PolicyNetwork(MultilayerPerceptron):
 
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
+
+        self.to(device)
 
     def forward(self, state):
         mean, log_std = super().forward(state).chunk(chunks=2, dim=-1)
@@ -197,3 +205,26 @@ class PolicyNetwork(MultilayerPerceptron):
                 action = torch.tanh(mean + std * z)
         action = action.cpu().numpy()[0]
         return action
+
+
+class Critic(NetworkBase):
+    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None):
+        super().__init__()
+
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
+        self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims,
+                                         activation=activation, device=device)
+        self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims,
+                                         activation=activation, device=device)
+
+        self.to(device)
+
+    def forward(self, state, action):
+        q_value_1 = self.soft_q_net_1.forward(state, action)
+        q_value_2 = self.soft_q_net_2.forward(state, action)
+        return q_value_1, q_value_2
+
+
+Actor = PolicyNetwork
