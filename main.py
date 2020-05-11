@@ -50,8 +50,8 @@ def get_config():
                         help='render the environment')
     parser.add_argument('--vision-observation', action='store_true',
                         help='use rendered images as observation')
-    parser.add_argument('--image-size', type=int, default=128, metavar='SIZE',
-                        help='image size of vision observation (default: 128)')
+    parser.add_argument('--image-size', type=int, default=96, metavar='SIZE',
+                        help='image size of vision observation (default: 96)')
     parser.add_argument('--hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
                         help='hidden dimensions of FC controller')
     parser.add_argument('--activation', type=str, choices=['ReLU', 'LeakyReLU'], default='ReLU',
@@ -101,8 +101,8 @@ def get_config():
                         help='number of training epochs (default: 1000)')
     parser.add_argument('--n-episodes', type=int, default=100,
                         help='number of test episodes (default: 100)')
-    parser.add_argument('--n-updates', type=int, default=32,
-                        help='number of learning updates per epoch (default: 32)')
+    parser.add_argument('--n-updates', type=int, default=256,
+                        help='number of learning updates per epoch (default: 256)')
     parser.add_argument('--batch-size', type=int, default=256,
                         help='batch size (default: 256)')
     parser.add_argument('--n-samplers', type=int, default=4,

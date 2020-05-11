@@ -107,7 +107,7 @@ optional arguments:
                         new observation (default: 1)
   --render              render the environment
   --vision-observation  use rendered images as observation
-  --image-size SIZE     image size of vision observation (default: 128)
+  --image-size SIZE     image size of vision observation (default: 96)
   --hidden-dims DIM [DIM ...]
                         hidden dimensions of FC controller
   --activation {ReLU,LeakyReLU}
@@ -119,7 +119,7 @@ optional arguments:
   --n-episodes N_EPISODES
                         number of test episodes (default: 100)
   --n-updates N_UPDATES
-                        number of learning updates per epoch (default: 32)
+                        number of learning updates per epoch (default: 256)
   --batch-size BATCH_SIZE
                         batch size (default: 256)
   --n-samplers N_SAMPLERS
