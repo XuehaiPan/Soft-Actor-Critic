@@ -74,7 +74,7 @@ class Trainer(TrainerBase):
             next_state, _, _ = self.state_encoder(next_observation, next_hidden)
 
         for i in reversed(range(batch_size)):
-            episode, length, offset = tuple(map(list.pop, [episodes, lengths, offsets]))
+            episode, length, offset = episodes.pop(), lengths.pop(), offsets.pop()
             if offset == length:
                 continue
 
