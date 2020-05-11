@@ -158,8 +158,8 @@ cat_hidden = GRUHidden.cat
 
 class RecurrentNeuralNetwork(NetworkBase):
     def __init__(self, n_dims_before_rnn, n_dims_rnn_hidden, n_dims_after_rnn,
-                 skip_connection, trainable_initial_hidden=True, activation=F.relu,
-                 output_activation=None, device=None):
+                 skip_connection=False, trainable_initial_hidden=False,
+                 activation=F.relu, output_activation=None, device=None):
         assert len(n_dims_rnn_hidden) > 0
 
         super().__init__()
@@ -232,10 +232,9 @@ class RecurrentNeuralNetwork(NetworkBase):
 
 
 class ConvolutionalNeuralNetwork(NetworkBase):
-    def __init__(self, image_size, input_channels, output_dim,
-                 n_hidden_channels, kernel_sizes, strides, paddings,
-                 poolings, batch_normalization, activation=F.relu,
-                 output_activation=None, device=None):
+    def __init__(self, image_size, input_channels, output_dim, n_hidden_channels,
+                 kernel_sizes, strides, paddings, poolings, batch_normalization=False,
+                 activation=F.relu, output_activation=None, device=None):
         assert len(n_hidden_channels) == len(kernel_sizes)
         assert len(n_hidden_channels) == len(strides)
         assert len(n_hidden_channels) == len(paddings)
