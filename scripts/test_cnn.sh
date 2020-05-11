@@ -28,6 +28,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--strides 1 1 1 1 \
 	--paddings 2 2 1 1 \
 	--poolings 2 2 2 1 \
+	--encoder-activation LeakyReLU \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \

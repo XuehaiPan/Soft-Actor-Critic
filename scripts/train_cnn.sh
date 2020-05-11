@@ -28,6 +28,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--strides 1 1 1 1 \
 	--paddings 2 2 1 1 \
 	--poolings 2 2 2 1 \
+	--encoder-activation LeakyReLU \
 	--max-episode-steps 500 \
 	--n-epochs 1000 --n-updates 256 --batch-size 128 \
 	--n-samplers 4 \

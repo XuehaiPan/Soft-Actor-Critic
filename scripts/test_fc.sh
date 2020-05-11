@@ -22,6 +22,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--encoder-arch FC \
 	--state-dim 128 \
 	--encoder-hidden-dims 128 128 \
+	--encoder-activation LeakyReLU \
 	--n-episodes 100 \
 	--n-samplers 4 \
 	--random-seed 0 \

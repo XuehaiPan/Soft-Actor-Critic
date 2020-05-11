@@ -70,7 +70,8 @@ usage: main.py [-h] [--mode {train,test}]
                [--n-frames N_FRAMES] [--render] [--vision-observation]
                [--image-size SIZE] [--hidden-dims DIM [DIM ...]]
                [--activation {ReLU,LeakyReLU}] [--encoder-arch {FC,RNN,CNN}]
-               [--state-dim DIM] [--encoder-hidden-dims DIM [DIM ...]]
+               [--state-dim DIM] [--encoder-activation ACTIVATION]
+               [--encoder-hidden-dims DIM [DIM ...]]
                [--encoder-hidden-dims-before-rnn DIM [DIM ...]]
                [--encoder-hidden-dims-rnn DIM [DIM ...]]
                [--encoder-hidden-dims-after-rnn DIM [DIM ...]]
@@ -110,7 +111,8 @@ optional arguments:
   --hidden-dims DIM [DIM ...]
                         hidden dimensions of FC controller
   --activation {ReLU,LeakyReLU}
-                        activation function in networks (default: ReLU)
+                        activation function in controller networks (default:
+                        ReLU)
   --max-episode-steps MAX_EPISODE_STEPS
                         max steps per episode (default: 10000)
   --n-epochs N_EPOCHS   number of training epochs (default: 1000)
@@ -149,6 +151,9 @@ state encoder:
                         architecture of state encoder network (default: FC)
   --state-dim DIM       target state dimension of encoded state (use
                         env.observation_space.shape if not present)
+  --encoder-activation ACTIVATION
+                        activation function in state encoder networks (use
+                        activation function in controller if not present)
 
 FC state encoder:
   --encoder-hidden-dims DIM [DIM ...]

@@ -24,6 +24,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--encoder-hidden-dims-before-rnn 128 \
 	--encoder-hidden-dims-rnn 64 \
 	--encoder-hidden-dims-after-rnn 128 \
+	--encoder-activation LeakyReLU \
 	--skip-connection \
 	--n-episodes 100 \
 	--n-samplers 4 \

@@ -55,12 +55,16 @@ def get_config():
     parser.add_argument('--hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
                         help='hidden dimensions of FC controller')
     parser.add_argument('--activation', type=str, choices=['ReLU', 'LeakyReLU'], default='ReLU',
-                        help='activation function in networks (default: ReLU)')
+                        help='activation function in controller networks (default: ReLU)')
     encoder_group = parser.add_argument_group('state encoder')
     encoder_group.add_argument('--encoder-arch', type=str, choices=['FC', 'RNN', 'CNN'], default='FC',
                                help='architecture of state encoder network (default: FC)')
     encoder_group.add_argument('--state-dim', type=int, default=None, metavar='DIM',
-                               help='target state dimension of encoded state (use env.observation_space.shape if not present)')
+                               help='target state dimension of encoded state '
+                                    '(use env.observation_space.shape if not present)')
+    encoder_group.add_argument('--encoder-activation', type=str, choices=['ReLU', 'LeakyReLU'], metavar='ACTIVATION',
+                               help='activation function in state encoder networks '
+                                    '(use activation function in controller if not present)')
     fc_encoder_group = parser.add_argument_group('FC state encoder')
     fc_encoder_group.add_argument('--encoder-hidden-dims', type=int, default=[], nargs='+', metavar='DIM',
                                   help='hidden dimensions of FC state encoder')
@@ -169,7 +173,13 @@ def initialize(config):
 
 
 def initialize_hyperparameters(config):
-    config.activation = {'ReLU': F.relu, 'LeakyReLU': F.leaky_relu}.get(config.activation)
+    config.activation = {
+        'ReLU': F.relu, 'LeakyReLU': F.leaky_relu
+    }.get(config.activation)
+    config.encoder_activation = {
+        'ReLU': F.relu, 'LeakyReLU': F.leaky_relu,
+        None: config.activation
+    }.get(config.encoder_activation)
 
     config.FC_encoder = (config.encoder_arch == 'FC')
     config.RNN_encoder = (config.encoder_arch == 'RNN')
