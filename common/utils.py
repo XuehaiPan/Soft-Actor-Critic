@@ -11,8 +11,8 @@ CHECKPOINT_REGEX = re.compile(r'^(.*/)?[\w-]*-(?P<epoch>\d+)-(?P<reward>[\-+Ee\d
 
 
 def clone_network(src_net, device=None):
-    if device is None and hasattr(src_net, 'device'):
-        device = src_net.device
+    if device is None:
+        device = getattr(src_net, 'device', None)
 
     dst_net = copy.deepcopy(src_net)
 

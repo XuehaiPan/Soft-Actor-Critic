@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 __all__ = [
     'build_encoder',
-    'NetworkBase',
+    'Container', 'NetworkBase',
     'VanillaNeuralNetwork', 'VanillaNN',
     'MultilayerPerceptron', 'MLP',
     'GRUHidden', 'cat_hidden',
@@ -54,7 +54,7 @@ def build_encoder(config):
     return state_encoder
 
 
-class NetworkBase(nn.Module):
+class Container(nn.Module):
     def __init__(self):
         super().__init__()
         self.device = None
@@ -64,16 +64,23 @@ class NetworkBase(nn.Module):
         if device is not None:
             device = torch.device(device)
             for module in self.children():
-                if isinstance(module, NetworkBase):
+                if isinstance(module, Container):
                     module.to(device)
             self.device = device
         return super().to(*args, **kwargs)
 
     def save_model(self, path):
-        torch.save(self.state_dict(), path)
+        state_dict = self.state_dict()
+        for key, value in state_dict.items():
+            state_dict[key] = value.cpu()
+
+        torch.save(state_dict, path)
 
     def load_model(self, path):
         self.load_state_dict(torch.load(path, map_location=self.device))
+
+
+NetworkBase = Container
 
 
 class VanillaNeuralNetwork(NetworkBase):

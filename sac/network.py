@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 
-from common.network import NetworkBase, MultilayerPerceptron
+from common.network import Container, MultilayerPerceptron
 
 
 __all__ = [
@@ -19,7 +19,7 @@ LOG_STD_MIN = np.log(1E-8)
 LOG_STD_MAX = np.log(20.0)
 
 
-class StateEncoderWrapper(NetworkBase):
+class StateEncoderWrapper(Container):
     def __init__(self, encoder, device=None):
         super().__init__()
 
@@ -38,7 +38,7 @@ class StateEncoderWrapper(NetworkBase):
         return encoded
 
 
-class DimensionScaler(NetworkBase):
+class DimensionScaler(Container):
     def __init__(self, input_dim, output_dim, device=None):
         super().__init__()
 
@@ -207,7 +207,7 @@ class PolicyNetwork(MultilayerPerceptron):
         return action
 
 
-class Critic(NetworkBase):
+class Critic(Container):
     def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None):
         super().__init__()
 

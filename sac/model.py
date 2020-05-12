@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from common.collector import Collector
+from common.network import Container
 from common.utils import clone_network, sync_params
 from sac.network import StateEncoderWrapper, Actor, Critic
 
@@ -69,22 +70,20 @@ class ModelBase(object):
 
         self.training = True
 
-        self.state_encoder = state_encoder_wrapper(state_encoder, device=self.model_device)
+        self.state_encoder = state_encoder_wrapper(state_encoder)
 
-        self.critic = Critic(state_dim, action_dim, hidden_dims,
-                             activation=activation, device=self.model_device)
-        self.actor = Actor(state_dim, action_dim, hidden_dims,
-                           activation=activation, device=self.model_device)
+        self.critic = Critic(state_dim, action_dim, hidden_dims, activation=activation)
+        self.actor = Actor(state_dim, action_dim, hidden_dims, activation=activation)
 
-        self.log_alpha = nn.Parameter(torch.tensor([[np.log(initial_alpha)]], dtype=torch.float32, device=self.model_device),
+        self.log_alpha = nn.Parameter(torch.tensor([np.log(initial_alpha)], dtype=torch.float32),
                                       requires_grad=True)
 
-        self.modules = nn.ModuleDict([
-            ('state_encoder', self.state_encoder),
-            ('critic', self.critic),
-            ('actor', self.actor),
-            ('params', nn.ParameterDict({'log_alpha': self.log_alpha}))
-        ])
+        self.modules = Container()
+        self.modules.state_encoder = self.state_encoder
+        self.modules.critic = self.critic
+        self.modules.actor = self.actor
+        self.modules.params = nn.ParameterDict({'log_alpha': self.log_alpha})
+        self.modules.to(self.model_device)
 
         self.state_encoder.share_memory()
         self.actor.share_memory()
@@ -133,10 +132,10 @@ class ModelBase(object):
         return self.train(mode=False)
 
     def save_model(self, path):
-        torch.save(self.modules.state_dict(), path)
+        self.modules.save_model(path)
 
     def load_model(self, path):
-        self.modules.load_state_dict(torch.load(path, map_location=self.model_device))
+        self.modules.load_model(path)
 
 
 class TrainerBase(ModelBase):
