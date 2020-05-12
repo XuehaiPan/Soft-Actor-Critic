@@ -27,7 +27,7 @@ PYTHONWARNINGS=ignore python3 main.py \
 	--encoder-activation LeakyReLU \
 	--skip-connection \
 	--max-episode-steps 500 \
-	--n-epochs 1000 --n-updates 256 --batch-size 16 --step-size 16 \
+	--n-epochs 1000 --n-updates 256 --batch-size 32 --step-size 16 \
 	--n-samplers 4 \
 	--buffer-capacity 1000000 \
 	--update-sample-ratio 2.0 \
