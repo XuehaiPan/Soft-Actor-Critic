@@ -98,7 +98,7 @@ def train(model, config):
 
     model.collector.eval()
     while model.replay_buffer.size < 10 * config.n_samples_per_update:
-        model.sample(n_episodes=10,
+        model.sample(n_episodes=10 * int(np.ceil(config.n_samples_per_update / config.max_episode_steps)),
                      max_episode_steps=config.max_episode_steps,
                      deterministic=False,
                      random_sample=True,

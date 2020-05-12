@@ -71,6 +71,8 @@ def initialize_environment(config):
         except TypeError:
             pass
         config.env_kwargs['max_episode_steps'] = config.max_episode_steps
+        if config.RNN_encoder:
+            assert config.step_size <= config.max_episode_steps
 
 
 class FlattenedAction(gym.ActionWrapper):
