@@ -42,7 +42,8 @@ class Trainer(TrainerBase):
                 next_observation = np.zeros_like(observation)
                 next_observation[:-1] = observation[1:]
                 episode = [observation, action, reward, next_observation, done]
-                self.episode_cache.append((episode, length, 0, self.state_encoder.initial_hiddens()))
+                self.episode_cache.append((episode, length, 0,
+                                           self.state_encoder.initial_hiddens().cpu()))
 
         batch = []
         offsets = []
@@ -63,7 +64,7 @@ class Trainer(TrainerBase):
         # size: (step_size, batch_size, item_size)
         observation, action, reward, next_observation, done \
             = tuple(map(lambda tensors: torch.stack(tensors, dim=1), zip(*batch)))
-        hidden = cat_hidden(hiddens, dim=1)
+        hidden = cat_hidden(hiddens, dim=1).to(self.model_device)
 
         # size: (step_size, batch_size, item_size)
         state, hidden_last, hidden_all = self.state_encoder(observation, hidden)
@@ -83,7 +84,7 @@ class Trainer(TrainerBase):
             else:  # offset + step_size > length
                 hidden = hidden_all[offset + step_size - length - 1, i].unsqueeze(dim=0).unsqueeze(dim=0)
                 offset = length - step_size
-            self.episode_cache.appendleft((episode, length, offset, hidden.detach()))
+            self.episode_cache.appendleft((episode, length, offset, hidden.detach().cpu()))
 
         # size: (batch_size * step_size, item_size)
         state, action, reward, next_state, done \

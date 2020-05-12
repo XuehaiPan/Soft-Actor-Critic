@@ -60,26 +60,42 @@ class EpisodeReplayBuffer(ReplayBuffer):
         super().__init__(capacity=capacity, initializer=initializer, Value=Value, Lock=Lock)
         self.lengths = initializer()
         self.buffer_size = Value('L', 0)
+        self.n_total_episodes = Value('L', 0)
+        self.length_mean = Value('f', 0.0)
+        self.length_square_mean = Value('f', 0.0)
 
     def push(self, *args):
         items = tuple(args)
         length = len(args[0])
         with self.lock:
+            buffer_len = len(self.buffer)
             if self.size + length <= self.capacity:
                 self.buffer.append(items)
                 self.lengths.append(length)
                 self.buffer_size.value += length
-                self.offset += 1
+                self.offset = buffer_len + 1
             else:
+                self.offset %= buffer_len
                 self.buffer[self.offset] = items
                 self.buffer_size.value += length - self.lengths[self.offset]
                 self.lengths[self.offset] = length
-                self.offset = (self.offset + 1) % (len(self.buffer))
+                self.offset = (self.offset + 1) % buffer_len
+            self.n_total_episodes.value += 1
+            self.length_mean.value += (length - self.length_mean.value) \
+                                      / self.n_total_episodes.value
+            self.length_square_mean.value += (length * length - self.length_square_mean.value) \
+                                             / self.n_total_episodes.value
 
     def sample(self, batch_size, min_length=16):
-        with self.lock:
-            lengths = np.asanyarray(self.lengths)
-        weights = lengths / lengths.sum()
+        length_mean = self.length_mean.value
+        length_square_mean = self.length_square_mean.value
+        length_stddev = np.sqrt(length_square_mean - length_mean * length_mean)
+
+        if length_stddev / length_mean < 0.1:
+            weights = np.ones(shape=(len(self.lengths),))
+        else:
+            weights = np.asanyarray(list(self.lengths))
+        weights = weights / weights.sum()
 
         episodes = []
         lengths = []
