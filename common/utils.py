@@ -51,9 +51,10 @@ def check_devices(config):
 
 def get_checkpoint(checkpoint_dir, by='epoch'):
     try:
-        return max(glob.iglob(os.path.join(checkpoint_dir, '*.pkl')),
-                   key=lambda path: float(CHECKPOINT_REGEX.search(path).group(by)),
-                   default=None)
+        checkpoints = glob.iglob(os.path.join(checkpoint_dir, '*.pkl'))
+        matches = filter(None, map(CHECKPOINT_REGEX.search, checkpoints))
+        max_match = max(matches, key=lambda match: float(match.group(by)), default=None)
+        return max_match.group()
     except AttributeError:
         return None
 
