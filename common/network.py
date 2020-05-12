@@ -176,7 +176,7 @@ class RecurrentNeuralNetwork(NetworkBase):
 
         self.linear_layers_before_rnn = VanillaNeuralNetwork(n_dims=n_dims_before_rnn,
                                                              activation=activation,
-                                                             output_activation=activation)
+                                                             output_activation=None)
 
         self.gru_layers = nn.ModuleList()
         for i in range(len(n_dims_rnn_hidden) - 1):
@@ -238,6 +238,7 @@ class ConvolutionalNeuralNetwork(NetworkBase):
         assert len(n_hidden_channels) == len(kernel_sizes)
         assert len(n_hidden_channels) == len(strides)
         assert len(n_hidden_channels) == len(paddings)
+        assert len(n_hidden_channels) == len(poolings)
 
         super().__init__()
 
