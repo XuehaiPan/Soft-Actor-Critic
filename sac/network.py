@@ -30,10 +30,10 @@ class StateEncoderWrapper(Container):
     def forward(self, *input, **kwargs):
         return self.encoder.forward(*input, **kwargs)
 
+    @torch.no_grad()
     def encode(self, observation):
-        with torch.no_grad():
-            observation = torch.FloatTensor(observation).unsqueeze(dim=0).to(self.device)
-            encoded = self(observation)
+        observation = torch.FloatTensor(observation).unsqueeze(dim=0).to(self.device)
+        encoded = self(observation)
         encoded = encoded.cpu().numpy()[0]
         return encoded
 
@@ -127,8 +127,7 @@ class ValueNetwork(MultilayerPerceptron):
     def __init__(self, state_dim, hidden_dims, activation=F.relu, device=None):
         super().__init__(n_dims=[state_dim, *hidden_dims, 1],
                          activation=activation,
-                         output_activation=None,
-                         device=device)
+                         output_activation=None)
 
         self.state_dim = state_dim
 
@@ -144,16 +143,14 @@ class SoftQNetwork(MultilayerPerceptron):
 
         super().__init__(n_dims=[state_dim + scaled_action_dim, *hidden_dims, 1],
                          activation=activation,
-                         output_activation=None,
-                         device=device)
+                         output_activation=None)
 
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.scaled_action_dim = scaled_action_dim
 
         self.action_scaler = DimensionScaler(input_dim=action_dim,
-                                             output_dim=scaled_action_dim,
-                                             device=device)
+                                             output_dim=scaled_action_dim)
 
         self.to(device)
 
@@ -166,8 +163,7 @@ class PolicyNetwork(MultilayerPerceptron):
                  log_std_min=LOG_STD_MIN, log_std_max=LOG_STD_MAX):
         super().__init__(n_dims=[state_dim, *hidden_dims, 2 * action_dim],
                          activation=activation,
-                         output_activation=None,
-                         device=device)
+                         output_activation=None)
 
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -193,16 +189,16 @@ class PolicyNetwork(MultilayerPerceptron):
         log_prob = log_prob.sum(dim=-1, keepdim=True)
         return action, log_prob, distribution
 
+    @torch.no_grad()
     def get_action(self, state, deterministic=False):
-        with torch.no_grad():
-            state = torch.FloatTensor(state).unsqueeze(dim=0).to(self.device)
-            mean, std = self(state)
+        state = torch.FloatTensor(state).unsqueeze(dim=0).to(self.device)
+        mean, std = self(state)
 
-            if deterministic:
-                action = torch.tanh(mean)
-            else:
-                z = Normal(0, 1).sample()
-                action = torch.tanh(mean + std * z)
+        if deterministic:
+            action = torch.tanh(mean)
+        else:
+            z = Normal(0, 1).sample()
+            action = torch.tanh(mean + std * z)
         action = action.cpu().numpy()[0]
         return action
 
@@ -214,10 +210,8 @@ class Critic(Container):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
-        self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims,
-                                         activation=activation, device=device)
-        self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims,
-                                         activation=activation, device=device)
+        self.soft_q_net_1 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation)
+        self.soft_q_net_2 = SoftQNetwork(state_dim, action_dim, hidden_dims, activation=activation)
 
         self.to(device)
 
