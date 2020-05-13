@@ -7,7 +7,8 @@ import re
 import torch
 
 
-CHECKPOINT_REGEX = re.compile(r'^(.*/)?[\w-]*-(?P<epoch>\d+)-(?P<reward>[\-+Ee\d.]+)\.pkl$')
+CHECKPOINT_FORMAT = '{prefix}epoch({epoch})-reward({reward:+.2E}){suffix}.pkl'
+CHECKPOINT_PATTERN = re.compile(r'^(.*/)?[\w-]*epoch\((?P<epoch>\d+)\)-reward\((?P<reward>[\-+Ee\d.]+)\)[\w-]*\.pkl$')
 
 
 def clone_network(src_net, device=None):
@@ -52,7 +53,7 @@ def check_devices(config):
 def get_checkpoint(checkpoint_dir, by='epoch'):
     try:
         checkpoints = glob.iglob(os.path.join(checkpoint_dir, '*.pkl'))
-        matches = filter(None, map(CHECKPOINT_REGEX.search, checkpoints))
+        matches = filter(None, map(CHECKPOINT_PATTERN.match, checkpoints))
         max_match = max(matches, key=lambda match: float(match.group(by)), default=None)
         return max_match.group()
     except AttributeError:
@@ -72,7 +73,7 @@ def check_logging(config):
     else:
         initial_checkpoint = None
     if initial_checkpoint is not None:
-        initial_epoch = int(CHECKPOINT_REGEX.search(initial_checkpoint).group('epoch'))
+        initial_epoch = int(CHECKPOINT_PATTERN.search(initial_checkpoint).group('epoch'))
     else:
         initial_epoch = 0
 

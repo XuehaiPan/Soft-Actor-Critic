@@ -7,6 +7,8 @@ import tqdm
 from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
+from common.utils import CHECKPOINT_FORMAT
+
 
 def train_loop(model, config, update_kwargs):
     with SummaryWriter(log_dir=os.path.join(config.log_dir, 'trainer'), comment='trainer') as writer:
@@ -79,8 +81,9 @@ def train_loop(model, config, update_kwargs):
 
             writer.flush()
             if epoch % 10 == 0:
-                model.save_model(path=os.path.join(config.checkpoint_dir,
-                                                   f'checkpoint-{epoch}-{mean_episode_reward:+.2E}.pkl'))
+                checkpoint_name = CHECKPOINT_FORMAT.format(epoch=epoch, reward=mean_episode_reward,
+                                                           prefix='', suffix='')
+                model.save_model(path=os.path.join(config.checkpoint_dir, checkpoint_name))
 
 
 def train(model, config):
