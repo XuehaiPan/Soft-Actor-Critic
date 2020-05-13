@@ -105,13 +105,13 @@ def train(model, config):
                      render=config.render)
 
     model.collector.train()
-    samplers = model.async_sample(n_episodes=np.inf,
-                                  deterministic=False,
-                                  random_sample=False,
-                                  **config.build_from_keys(['max_episode_steps',
-                                                            'render',
-                                                            'log_episode_video',
-                                                            'log_dir']))
+    model.async_sample(n_episodes=np.inf,
+                       deterministic=False,
+                       random_sample=False,
+                       **config.build_from_keys(['max_episode_steps',
+                                                 'render',
+                                                 'log_episode_video',
+                                                 'log_dir']))
 
     try:
         train_loop(model, config, update_kwargs)
@@ -119,12 +119,6 @@ def train(model, config):
         pass
     except Exception:
         raise
-    finally:
-        for sampler in samplers:
-            if sampler.is_alive():
-                sampler.terminate()
-            sampler.join()
-            sampler.close()
 
 
 def test(model, config):

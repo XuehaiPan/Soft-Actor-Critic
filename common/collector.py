@@ -25,7 +25,7 @@ class Sampler(mp.Process):
                  n_episodes, max_episode_steps,
                  deterministic, random_sample, render, log_episode_video,
                  device, random_seed, log_dir):
-        super().__init__(name=f'sampler_{rank}')
+        super().__init__(name=f'sampler_{rank}', daemon=True)
 
         self.rank = rank
         self.lock = lock
@@ -277,6 +277,8 @@ class CollectorBase(object):
         self.devices = [device for _, device in zip(range(n_samplers), itertools.cycle(devices))]
         self.random_seed = random_seed
 
+        self.samplers = []
+
     @property
     def n_episodes(self):
         return len(self.episode_steps)
@@ -294,7 +296,6 @@ class CollectorBase(object):
             event.clear()
         events[0].set()
 
-        samplers = []
         for rank in range(self.n_samplers):
             sampler = self.sampler(rank, self.n_samplers, self.lock,
                                    self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
@@ -305,16 +306,16 @@ class CollectorBase(object):
                                    deterministic, random_sample, render, log_episode_video,
                                    self.devices[rank], self.random_seed + rank, log_dir)
             sampler.start()
-            samplers.append(sampler)
+            self.samplers.append(sampler)
 
-        return samplers
+        return self.samplers
 
     def sample(self, n_episodes, max_episode_steps, deterministic=False, random_sample=False,
                render=False, log_episode_video=False, log_dir=None):
         n_initial_episodes = self.n_episodes
 
-        samplers = self.async_sample(n_episodes, max_episode_steps, deterministic, random_sample,
-                                     render, log_episode_video, log_dir)
+        self.async_sample(n_episodes, max_episode_steps, deterministic, random_sample,
+                          render, log_episode_video, log_dir)
 
         pbar = tqdm.tqdm(total=n_episodes, desc='Sampling')
         while True:
@@ -327,9 +328,23 @@ class CollectorBase(object):
             else:
                 time.sleep(0.1)
 
-        for sampler in samplers:
+        self.join()
+
+    def join(self):
+        for sampler in self.samplers:
             sampler.join()
             sampler.close()
+        self.samplers.clear()
+
+    def terminate(self):
+        self.pause()
+        for sampler in self.samplers:
+            if sampler.is_alive():
+                try:
+                    sampler.terminate()
+                except Exception:
+                    pass
+        self.join()
 
     def pause(self):
         self.running_event.clear()
