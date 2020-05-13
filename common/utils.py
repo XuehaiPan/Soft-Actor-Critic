@@ -3,11 +3,13 @@ import glob
 import json
 import os
 import re
+from functools import partial
 
 import torch
 
 
 CHECKPOINT_FORMAT = '{prefix}epoch({epoch})-reward({reward:+.2E}){suffix}.pkl'
+CHECKPOINT_FORMAT = partial(CHECKPOINT_FORMAT.format, prefix='', suffix='')
 CHECKPOINT_PATTERN = re.compile(r'^(.*/)?[\w-]*epoch\((?P<epoch>\d+)\)-reward\((?P<reward>[\-+Ee\d.]+)\)[\w-]*\.pkl$')
 
 

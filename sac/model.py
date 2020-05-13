@@ -1,5 +1,6 @@
 import itertools
 import os
+from functools import partialmethod
 
 import numpy as np
 import torch
@@ -13,7 +14,7 @@ from common.utils import clone_network, sync_params
 from sac.network import StateEncoderWrapper, Actor, Critic
 
 
-__all__ = ['build_model', 'ModelBase', 'TrainerBase', 'Trainer', 'Tester']
+__all__ = ['build_model', 'TrainerBase', 'TesterBase', 'Trainer', 'Tester']
 
 
 def build_model(config):
@@ -256,17 +257,20 @@ class TrainerBase(ModelBase):
         self.target_critic.eval()
 
 
-class Trainer(TrainerBase):
+class TesterBase(ModelBase):
     def __init__(self, *args, **kwargs):
-        kwargs.update(state_encoder_wrapper=StateEncoderWrapper,
-                      collector=Collector)
-        super().__init__(*args, **kwargs)
-
-
-class Tester(ModelBase):
-    def __init__(self, *args, **kwargs):
-        kwargs.update(state_encoder_wrapper=StateEncoderWrapper,
-                      collector=Collector)
         super().__init__(*args, **kwargs)
 
         self.eval()
+
+
+class Trainer(TrainerBase):
+    __init__ = partialmethod(TrainerBase.__init__,
+                             state_encoder_wrapper=StateEncoderWrapper,
+                             collector=Collector)
+
+
+class Tester(TesterBase):
+    __init__ = partialmethod(TesterBase.__init__,
+                             state_encoder_wrapper=StateEncoderWrapper,
+                             collector=Collector)

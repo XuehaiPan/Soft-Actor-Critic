@@ -81,8 +81,7 @@ def train_loop(model, config, update_kwargs):
 
             writer.flush()
             if epoch % 10 == 0:
-                checkpoint_name = CHECKPOINT_FORMAT.format(epoch=epoch, reward=mean_episode_reward,
-                                                           prefix='', suffix='')
+                checkpoint_name = CHECKPOINT_FORMAT(epoch=epoch, reward=mean_episode_reward)
                 model.save_model(path=os.path.join(config.checkpoint_dir, checkpoint_name))
 
 

@@ -1,7 +1,7 @@
 import itertools
 import os
 import time
-from functools import lru_cache
+from functools import lru_cache, partialmethod
 
 import numpy as np
 import torch.multiprocessing as mp
@@ -361,20 +361,12 @@ class CollectorBase(object):
 
 
 class Collector(CollectorBase):
-    def __init__(self, env_func, env_kwargs, state_encoder, actor,
-                 n_samplers, buffer_capacity, devices, random_seed):
-        super().__init__(env_func, env_kwargs,
-                         state_encoder, actor,
-                         n_samplers, Sampler,
-                         ReplayBuffer, buffer_capacity,
-                         devices, random_seed)
+    __init__ = partialmethod(CollectorBase.__init__,
+                             sampler=Sampler,
+                             replay_buffer=ReplayBuffer)
 
 
 class EpisodeCollector(CollectorBase):
-    def __init__(self, env_func, env_kwargs, state_encoder, actor,
-                 n_samplers, buffer_capacity, devices, random_seed):
-        super().__init__(env_func, env_kwargs,
-                         state_encoder, actor,
-                         n_samplers, EpisodeSampler,
-                         EpisodeReplayBuffer, buffer_capacity,
-                         devices, random_seed)
+    __init__ = partialmethod(CollectorBase.__init__,
+                             sampler=EpisodeSampler,
+                             replay_buffer=EpisodeReplayBuffer)

@@ -1,11 +1,12 @@
 from collections import deque
+from functools import lru_cache, partialmethod
 
 import numpy as np
 import torch
 
 from common.collector import EpisodeCollector
 from common.network import cat_hidden
-from sac.model import ModelBase, TrainerBase
+from sac.model import TrainerBase, TesterBase
 from sac.rnn.network import StateEncoderWrapper
 
 
@@ -13,11 +14,9 @@ __all__ = ['Trainer', 'Tester']
 
 
 class Trainer(TrainerBase):
-    def __init__(self, *args, **kwargs):
-        kwargs.update(state_encoder_wrapper=StateEncoderWrapper,
-                      collector=EpisodeCollector)
-        super().__init__(*args, **kwargs)
-        self.episode_cache = deque(maxlen=None)
+    __init__ = partialmethod(TrainerBase.__init__,
+                             state_encoder_wrapper=StateEncoderWrapper,
+                             collector=EpisodeCollector)
 
     def update(self, batch_size, step_size=16,
                normalize_rewards=True, reward_scale=1.0,
@@ -93,11 +92,13 @@ class Trainer(TrainerBase):
 
         return state, action, reward, next_state, done
 
+    @property
+    @lru_cache(maxsize=None)
+    def episode_cache(self):
+        return deque(maxlen=None)
 
-class Tester(ModelBase):
-    def __init__(self, *args, **kwargs):
-        kwargs.update(state_encoder_wrapper=StateEncoderWrapper,
-                      collector=EpisodeCollector)
-        super().__init__(*args, **kwargs)
 
-        self.eval()
+class Tester(TesterBase):
+    __init__ = partialmethod(TesterBase.__init__,
+                             state_encoder_wrapper=StateEncoderWrapper,
+                             collector=EpisodeCollector)
