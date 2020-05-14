@@ -167,9 +167,9 @@ def initialize(config):
 
     initialize_hyperparameters(config)
     initialize_environment(config)
+    build_encoder(config)
     check_devices(config)
     check_logging(config)
-    build_encoder(config)
 
 
 def initialize_hyperparameters(config):

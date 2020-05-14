@@ -71,9 +71,15 @@ def check_logging(config):
     os.makedirs(config.log_dir, exist_ok=True)
     os.makedirs(config.checkpoint_dir, exist_ok=True)
 
+    try:
+        from IPython.core.formatters import PlainTextFormatter
+        formatter = PlainTextFormatter()
+    except ImportError:
+        formatter = str
+
     for directory in (config.log_dir, config.checkpoint_dir):
         with open(file=os.path.join(directory, 'config.json'), mode='w') as file:
-            json.dump(config, file, indent=4, default=str)
+            json.dump(config, file, indent=4, default=formatter)
 
     if config.mode == 'test' or config.load_checkpoint:
         initial_checkpoint = get_checkpoint(config.checkpoint_dir, by='epoch')
