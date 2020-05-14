@@ -26,10 +26,15 @@ def clone_network(src_net, device=None):
 
 
 def sync_params(src_net, dst_net, soft_tau=1.0):
-    if soft_tau == 1.0:
+    assert 0.0 <= soft_tau <= 1.0
+    assert type(src_net) == type(dst_net)
+
+    if soft_tau == 0.0:
+        return
+    elif soft_tau == 1.0:
         for src_param, dst_param in zip(src_net.parameters(), dst_net.parameters()):
             dst_param.data.copy_(src_param.data)
-    else:
+    else:  # 0.0 < soft_tau < 1.0
         for src_param, dst_param in zip(src_net.parameters(), dst_net.parameters()):
             dst_param.data.copy_(dst_param.data * (1.0 - soft_tau) + src_param.data * soft_tau)
 
