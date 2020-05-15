@@ -11,7 +11,7 @@ import torch.optim as optim
 from common.collector import Collector
 from common.network import Container
 from common.utils import clone_network, sync_params
-from sac.network import StateEncoderWrapper, Actor, Critic
+from .network import StateEncoderWrapper, Actor, Critic
 
 
 __all__ = ['build_model', 'TrainerBase', 'TesterBase', 'Trainer', 'Tester']

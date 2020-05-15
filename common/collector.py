@@ -9,8 +9,8 @@ import tqdm
 from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
-from common.buffer import ReplayBuffer, EpisodeReplayBuffer
-from common.utils import clone_network, sync_params
+from .buffer import ReplayBuffer, EpisodeReplayBuffer
+from .utils import clone_network, sync_params
 
 
 __all__ = ['Collector', 'EpisodeCollector']

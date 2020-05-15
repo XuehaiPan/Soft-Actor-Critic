@@ -6,8 +6,8 @@ import torch
 
 from common.collector import EpisodeCollector
 from common.network import cat_hidden
-from sac.model import TrainerBase, TesterBase
-from sac.rnn.network import StateEncoderWrapper
+from .network import StateEncoderWrapper
+from ..model import TrainerBase, TesterBase
 
 
 __all__ = ['Trainer', 'Tester']

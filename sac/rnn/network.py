@@ -1,6 +1,6 @@
 import torch
 
-from sac.network import StateEncoderWrapper as OriginalStateEncoderWrapper
+from ..network import StateEncoderWrapper as OriginalStateEncoderWrapper
 
 
 __all__ = ['StateEncoderWrapper']
