@@ -22,7 +22,7 @@ def build_encoder(config):
         if config.state_dim is not None or len(config.encoder_hidden_dims) > 0:
             state_encoder = VanillaNeuralNetwork(n_dims=[config.observation_dim,
                                                          *config.encoder_hidden_dims,
-                                                         config.state_dim],
+                                                         state_dim],
                                                  activation=config.encoder_activation,
                                                  output_activation=None)
     elif config.RNN_encoder:
@@ -30,7 +30,7 @@ def build_encoder(config):
                                                                   *config.encoder_hidden_dims_before_rnn],
                                                n_dims_rnn_hidden=config.encoder_hidden_dims_rnn,
                                                n_dims_after_rnn=[*config.encoder_hidden_dims_after_rnn,
-                                                                 config.state_dim],
+                                                                 state_dim],
                                                skip_connection=config.skip_connection,
                                                trainable_initial_hidden=config.trainable_hidden,
                                                activation=config.encoder_activation,
@@ -38,7 +38,7 @@ def build_encoder(config):
     elif config.CNN_encoder:
         state_encoder = ConvolutionalNeuralNetwork(image_size=(config.image_size, config.image_size),
                                                    input_channels=config.observation_dim,
-                                                   output_dim=config.state_dim,
+                                                   output_dim=state_dim,
                                                    n_hidden_channels=config.encoder_hidden_channels,
                                                    activation=config.encoder_activation,
                                                    output_activation=None,
