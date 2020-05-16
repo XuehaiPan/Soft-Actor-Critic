@@ -68,10 +68,12 @@ class Trainer(TrainerBase):
         # size: (step_size, batch_size, item_size)
         state, hidden_last, hidden_all = self.state_encoder(observation, hidden)
         with torch.no_grad():
-            next_hidden = hidden_all[0].unsqueeze(dim=0)
+            # size: (1, batch_size, item_size)
+            next_observation_last = next_observation[-1].unsqueeze(dim=0)
+            next_state_last, _, _ = self.state_encoder(next_observation_last, hidden_last)
 
             # size: (step_size, batch_size, item_size)
-            next_state, _, _ = self.state_encoder(next_observation, next_hidden)
+            next_state = torch.cat([state[:-1].detach(), next_state_last], dim=0)
 
         for i in reversed(range(batch_size)):
             episode, length, offset = episodes.pop(), lengths.pop(), offsets.pop()
