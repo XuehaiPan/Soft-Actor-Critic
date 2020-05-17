@@ -60,7 +60,7 @@ class Container(nn.Module):
         self.device = None
 
     def to(self, *args, **kwargs):
-        device, dtype, non_blocking = torch._C._nn._parse_to(*args, **kwargs)
+        device, *_ = torch._C._nn._parse_to(*args, **kwargs)
         if device is not None:
             device = torch.device(device)
             for module in self.children():
