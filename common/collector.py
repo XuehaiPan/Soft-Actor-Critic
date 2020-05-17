@@ -42,6 +42,8 @@ class Sampler(mp.Process):
 
         self.shared_state_encoder = state_encoder
         self.shared_actor = actor
+        self.state_encoder = None
+        self.actor = None
         self.device = device
         self.eval_only = eval_only
 
@@ -65,6 +67,7 @@ class Sampler(mp.Process):
         self.log_dir = log_dir
 
         self.episode = 0
+        self.trajectory = []
         self.frames = []
         self.render()
 
@@ -75,24 +78,24 @@ class Sampler(mp.Process):
         self.env.seed(self.random_seed)
 
         if not self.random_sample:
-            state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-            actor = clone_network(src_net=self.shared_actor, device=self.device)
-            state_encoder.eval()
-            actor.eval()
-        else:
-            state_encoder = actor = None
+            self.state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
+            self.actor = clone_network(src_net=self.shared_actor, device=self.device)
+            self.state_encoder.eval()
+            self.actor.eval()
 
         self.episode = 0
         while self.episode < self.n_episodes:
             self.episode += 1
 
             if not (self.eval_only or self.random_sample):
-                sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-                sync_params(src_net=self.shared_actor, dst_net=actor)
+                sync_params(src_net=self.shared_state_encoder, dst_net=self.state_encoder)
+                sync_params(src_net=self.shared_actor, dst_net=self.actor)
 
             episode_reward = 0
             episode_steps = 0
-            trajectory = []
+            self.trajectory.clear()
+            if self.state_encoder is not None:
+                self.state_encoder.reset()
             observation = self.env.reset()
             self.render()
             self.frames.clear()
@@ -101,16 +104,16 @@ class Sampler(mp.Process):
                 if self.random_sample:
                     action = self.env.action_space.sample()
                 else:
-                    state = state_encoder.encode(observation)
-                    action = actor.get_action(state, deterministic=self.deterministic)
+                    state = self.state_encoder.encode(observation)
+                    action = self.actor.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
 
                 episode_reward += reward
                 episode_steps += 1
                 self.render()
                 self.save_frame(step=episode_steps, reward=reward, episode_reward=episode_reward)
+                self.add_transaction(observation, action, reward, next_observation, done)
 
-                trajectory.append((observation, action, [reward], next_observation, [done]))
                 observation = next_observation
 
                 if done:
@@ -119,7 +122,7 @@ class Sampler(mp.Process):
             self.running_event.wait()
             self.event.wait(timeout=self.timeout)
             with self.lock:
-                self.replay_buffer.extend(trajectory)
+                self.save_trajectory()
                 self.n_total_steps.value += episode_steps
                 self.episode_steps.append(episode_steps)
                 self.episode_rewards.append(episode_reward)
@@ -137,6 +140,12 @@ class Sampler(mp.Process):
 
         if self.writer is not None:
             self.writer.close()
+
+    def add_transaction(self, observation, action, reward, next_observation, done):
+        self.trajectory.append((observation, action, [reward], next_observation, [done]))
+
+    def save_trajectory(self):
+        self.replay_buffer.extend(self.trajectory)
 
     def close(self):
         try:
@@ -191,76 +200,11 @@ class Sampler(mp.Process):
 
 
 class EpisodeSampler(Sampler):
-    def run(self):
-        setproctitle(title=self.name)
+    def add_transaction(self, observation, action, reward, next_observation, done):
+        self.trajectory.append((observation, action, [reward], [done]))
 
-        self.env = self.env_func(**self.env_kwargs)
-        self.env.seed(self.random_seed)
-
-        if not self.random_sample:
-            state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
-            actor = clone_network(src_net=self.shared_actor, device=self.device)
-            state_encoder.eval()
-            actor.eval()
-        else:
-            state_encoder = actor = None
-
-        self.episode = 0
-        while self.episode < self.n_episodes:
-            self.episode += 1
-
-            if not (self.eval_only or self.random_sample):
-                sync_params(src_net=self.shared_state_encoder, dst_net=state_encoder)
-                sync_params(src_net=self.shared_actor, dst_net=actor)
-
-            episode_reward = 0
-            episode_steps = 0
-            trajectory = []
-            hidden = None
-            observation = self.env.reset()
-            self.frames.clear()
-            self.render()
-            self.save_frame(step=0, reward=np.nan, episode_reward=0.0)
-            for step in range(self.max_episode_steps):
-                if self.random_sample:
-                    action = self.env.action_space.sample()
-                else:
-                    state, hidden, _ = state_encoder.encode(observation, hidden=hidden)
-                    action = actor.get_action(state, deterministic=self.deterministic)
-                next_observation, reward, done, _ = self.env.step(action)
-
-                episode_reward += reward
-                episode_steps += 1
-                self.render()
-                self.save_frame(step=episode_steps, reward=reward, episode_reward=episode_reward)
-
-                trajectory.append((observation, action, [reward], [done]))
-                observation = next_observation
-
-                if done:
-                    break
-
-            self.running_event.wait()
-            self.event.wait(timeout=self.timeout)
-            with self.lock:
-                self.replay_buffer.push(*tuple(map(np.stack, zip(*trajectory))))
-                self.n_total_steps.value += episode_steps
-                self.episode_steps.append(episode_steps)
-                self.episode_rewards.append(episode_reward)
-            self.event.clear()
-            self.next_sampler_event.set()
-            if self.writer is not None:
-                average_reward = episode_reward / episode_steps
-                self.writer.add_scalar(tag='sample/cumulative_reward', scalar_value=episode_reward, global_step=self.episode)
-                self.writer.add_scalar(tag='sample/average_reward', scalar_value=average_reward, global_step=self.episode)
-                self.writer.add_scalar(tag='sample/episode_steps', scalar_value=episode_steps, global_step=self.episode)
-                self.log_video()
-                self.writer.flush()
-
-        self.env.close()
-
-        if self.writer is not None:
-            self.writer.close()
+    def save_trajectory(self):
+        self.replay_buffer.push(*tuple(map(np.stack, zip(*self.trajectory))))
 
 
 class CollectorBase(object):

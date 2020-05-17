@@ -27,6 +27,8 @@ class StateEncoderWrapper(Container):
 
         self.to(device)
 
+        self.reset()
+
     def forward(self, *input, **kwargs):
         return self.encoder.forward(*input, **kwargs)
 
@@ -36,6 +38,9 @@ class StateEncoderWrapper(Container):
         encoded = self(observation)
         encoded = encoded.cpu().numpy()[0]
         return encoded
+
+    def reset(self):
+        pass
 
 
 class DimensionScaler(Container):
