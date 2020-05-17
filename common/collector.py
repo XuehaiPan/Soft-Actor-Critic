@@ -6,6 +6,7 @@ from functools import lru_cache, partialmethod
 import numpy as np
 import torch.multiprocessing as mp
 import tqdm
+from PIL import Image, ImageDraw
 from setproctitle import setproctitle
 from torch.utils.tensorboard import SummaryWriter
 
@@ -95,7 +96,7 @@ class Sampler(mp.Process):
             observation = self.env.reset()
             self.render()
             self.frames.clear()
-            self.save_frame()
+            self.save_frame(step=0, reward=np.nan, episode_reward=0.0)
             for step in range(self.max_episode_steps):
                 if self.random_sample:
                     action = self.env.action_space.sample()
@@ -103,11 +104,12 @@ class Sampler(mp.Process):
                     state = state_encoder.encode(observation)
                     action = actor.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
-                self.render()
-                self.save_frame()
 
                 episode_reward += reward
                 episode_steps += 1
+                self.render()
+                self.save_frame(step=episode_steps, reward=reward, episode_reward=episode_reward)
+
                 trajectory.append((observation, action, [reward], next_observation, [done]))
                 observation = next_observation
 
@@ -154,12 +156,21 @@ class Sampler(mp.Process):
             except Exception:
                 pass
 
-    def save_frame(self):
+    def save_frame(self, step, reward, episode_reward):
         if not self.random_sample and self.log_episode_video and self.episode % 100 == 0:
             try:
-                self.frames.append(self.env.render(mode='rgb_array'))
+                img = self.env.render(mode='rgb_array')
             except Exception:
                 pass
+            else:
+                text = (f'step           = {step}\n'
+                        f'reward         = {reward:+.3f}\n'
+                        f'episode reward = {episode_reward:+.3f}')
+                img = Image.fromarray(img, mode='RGB')
+                draw = ImageDraw.Draw(img)
+                draw.multiline_text(xy=(10, 10), text=text, fill=(255, 0, 0))
+                img = np.asanyarray(img, dtype=np.uint8)
+                self.frames.append(img)
 
     def log_video(self):
         if self.writer is not None and self.log_episode_video and self.episode % 100 == 0:
@@ -209,7 +220,7 @@ class EpisodeSampler(Sampler):
             observation = self.env.reset()
             self.frames.clear()
             self.render()
-            self.save_frame()
+            self.save_frame(step=0, reward=np.nan, episode_reward=0.0)
             for step in range(self.max_episode_steps):
                 if self.random_sample:
                     action = self.env.action_space.sample()
@@ -217,11 +228,12 @@ class EpisodeSampler(Sampler):
                     state, hidden, _ = state_encoder.encode(observation, hidden=hidden)
                     action = actor.get_action(state, deterministic=self.deterministic)
                 next_observation, reward, done, _ = self.env.step(action)
-                self.render()
-                self.save_frame()
 
                 episode_reward += reward
                 episode_steps += 1
+                self.render()
+                self.save_frame(step=episode_steps, reward=reward, episode_reward=episode_reward)
+
                 trajectory.append((observation, action, [reward], [done]))
                 observation = next_observation
 
