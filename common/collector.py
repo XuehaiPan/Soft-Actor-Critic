@@ -156,7 +156,10 @@ class Sampler(mp.Process):
             self.writer.close()
         except Exception:
             pass
-        super().close()
+        try:
+            super().close()
+        except Exception:
+            pass
 
     def render(self, mode='human', **kwargs):
         if self.render_env:
