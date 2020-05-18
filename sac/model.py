@@ -39,12 +39,12 @@ def build_model(config):
         if not config.RNN_encoder:
             Model = Trainer
         else:
-            from sac.rnn.model import Trainer as Model
+            from .rnn.model import Trainer as Model
     else:
         if not config.RNN_encoder:
             Model = Tester
         else:
-            from sac.rnn.model import Tester as Model
+            from .rnn.model import Tester as Model
 
     model = Model(**model_kwargs)
     model.print_info()
