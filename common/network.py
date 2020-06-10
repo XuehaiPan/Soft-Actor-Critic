@@ -96,6 +96,9 @@ class VanillaNeuralNetwork(NetworkBase):
                                                        out_features=n_dims[i + 1],
                                                        bias=True))
 
+        self.in_features = n_dims[0]
+        self.out_features = n_dims[-1]
+
         self.to(device)
 
     def forward(self, x):
@@ -203,11 +206,15 @@ class RecurrentNeuralNetwork(NetworkBase):
             self.init_hiddens = []
             for i in range(len(n_dims_rnn_hidden) - 1):
                 self.init_hiddens.append(torch.zeros(1, 1, n_dims_rnn_hidden[i + 1],
-                                                     device=torch.device('cpu'), requires_grad=False))
+                                                     device=torch.device('cpu'),
+                                                     requires_grad=False))
 
         self.linear_layers_after_rnn = VanillaNeuralNetwork(n_dims=n_dims_after_rnn,
                                                             activation=activation,
                                                             output_activation=output_activation)
+
+        self.in_features = self.linear_layers_before_rnn.in_features
+        self.out_features = self.linear_layers_after_rnn.out_features
 
         self.to(device)
 
@@ -239,13 +246,16 @@ class RecurrentNeuralNetwork(NetworkBase):
 
 
 class ConvolutionalNeuralNetwork(NetworkBase):
-    def __init__(self, image_size, input_channels, output_dim, n_hidden_channels,
-                 kernel_sizes, strides, paddings, poolings, batch_normalization=False,
+    def __init__(self, image_size, input_channels, n_hidden_channels,
+                 kernel_sizes, strides, paddings, poolings,
+                 output_dim=None, headless=False, batch_normalization=False,
                  activation=F.relu, output_activation=None, device=None):
         assert len(n_hidden_channels) == len(kernel_sizes)
         assert len(n_hidden_channels) == len(strides)
         assert len(n_hidden_channels) == len(paddings)
         assert len(n_hidden_channels) == len(poolings)
+
+        assert bool(output_dim) != bool(headless)
 
         super().__init__()
 
@@ -280,15 +290,23 @@ class ConvolutionalNeuralNetwork(NetworkBase):
                 dummy = conv_layer(dummy)
                 dummy = max_pooling_layer(dummy)
         conv_output_dim = int(np.prod(dummy.size()))
-        self.linear_layer = nn.Linear(in_features=conv_output_dim,
-                                      out_features=output_dim,
-                                      bias=True)
+
+        if output_dim is not None:
+            assert not headless
+            self.linear_layer = nn.Linear(in_features=conv_output_dim,
+                                          out_features=output_dim,
+                                          bias=True)
+            self.out_features = output_dim
+        else:
+            assert headless
+            self.out_features = conv_output_dim
+        self.in_features = (input_channels, *image_size)
 
         self.to(device)
 
     def forward(self, x):
         input_size = x.size()
-        x = x.view(int(np.prod(input_size[:-3])), *input_size[-3:])
+        x = x.view(-1, *input_size[-3:])
 
         for i, (conv_layer, max_pooling_layer) in enumerate(zip(self.conv_layers,
                                                                 self.max_pooling_layers)):
@@ -299,7 +317,8 @@ class ConvolutionalNeuralNetwork(NetworkBase):
             x = max_pooling_layer(x)
 
         x = x.view(*input_size[:-3], -1)
-        x = self.linear_layer(x)
+        if hasattr(self, 'linear_layer'):
+            x = self.linear_layer(x)
         if self.output_activation is not None:
             x = self.output_activation(x)
 
