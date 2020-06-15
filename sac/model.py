@@ -181,7 +181,7 @@ class TrainerBase(ModelBase):
 
         # Update temperature parameter
         new_action, log_prob, _ = self.actor.evaluate(state)
-        if adaptive_entropy is True:
+        if adaptive_entropy:
             alpha_loss = -(self.log_alpha * (log_prob + target_entropy).detach()).mean()
             self.alpha_optimizer.zero_grad()
             alpha_loss.backward()
