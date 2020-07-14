@@ -56,7 +56,7 @@ class ReplayBuffer(object):
 
 
 class EpisodeReplayBuffer(ReplayBuffer):
-    def __init__(self, capacity, initializer, Value=mp.Value, Lock=mp.Lock()):
+    def __init__(self, capacity, initializer, Value=mp.Value, Lock=mp.Lock):
         super().__init__(capacity=capacity, initializer=initializer, Value=Value, Lock=Lock)
         self.lengths = initializer()
         self.buffer_size = Value('L', 0)
