@@ -69,15 +69,21 @@ class Container(nn.Module):
             self.device = device
         return super().to(*args, **kwargs)
 
-    def save_model(self, path):
+    def save_model(self, path, filter=None):
         state_dict = self.state_dict()
-        for key, value in state_dict.items():
-            state_dict[key] = value.cpu()
+        keys = list(state_dict.keys())
+        for key in keys:
+            if filter is not None and not filter(key):
+                state_dict.pop(key)
+            else:
+                state_dict[key] = state_dict[key].cpu()
 
         torch.save(state_dict, path)
 
-    def load_model(self, path):
-        self.load_state_dict(torch.load(path, map_location=self.device))
+        return state_dict
+
+    def load_model(self, path, strict=True):
+        return self.load_state_dict(torch.load(path, map_location=self.device), strict=strict)
 
 
 NetworkBase = Container

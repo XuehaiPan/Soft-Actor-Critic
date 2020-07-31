@@ -197,7 +197,7 @@ class Sampler(mp.Process):
     @lru_cache(maxsize=None)
     def writer(self):
         if not self.random_sample and self.log_dir is not None:
-            return SummaryWriter(log_dir=os.path.join(self.log_dir, f'sampler_{self.rank}'), comment=f'sampler_{self.rank}')
+            return SummaryWriter(log_dir=os.path.join(self.log_dir, self.name), comment=self.name)
         else:
             return None
 

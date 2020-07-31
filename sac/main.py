@@ -80,6 +80,7 @@ def train_loop(model, config, update_kwargs):
                               global_step=epoch)
 
             writer.flush()
+            model.save_model(path=os.path.join(config.checkpoint_dir, 'latest.pkl'))
             if epoch % 10 == 0:
                 checkpoint_name = CHECKPOINT_FORMAT(epoch=epoch, reward=mean_episode_reward)
                 model.save_model(path=os.path.join(config.checkpoint_dir, checkpoint_name))
