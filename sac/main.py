@@ -93,6 +93,8 @@ def train(model, config):
                                             'clip_gradient',
                                             'gamma',
                                             'soft_tau'])
+    if config.RNN_encoder:
+        update_kwargs.update(step_size=config.step_size)
     update_kwargs.update(target_entropy=-1.0 * config.action_dim)
 
     print(f'Start parallel sampling using {config.n_samplers} samplers '
