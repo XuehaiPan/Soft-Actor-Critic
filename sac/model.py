@@ -10,7 +10,7 @@ import torch.optim as optim
 
 from common.collector import Collector
 from common.network import Container
-from common.utils import clone_network, sync_params
+from common.utils import clone_network, sync_params, init_optimizer, clip_grad_norm
 from .network import StateEncoderWrapper, Actor, Critic
 
 
@@ -160,11 +160,7 @@ class TrainerBase(ModelBase):
                                                     self.critic.parameters(),
                                                     self.actor.parameters()),
                                     lr=critic_lr, weight_decay=weight_decay)
-        for param_group in self.optimizer.param_groups:
-            n_params = 0
-            for param in param_group['params']:
-                n_params += param.size().numel()
-            param_group['n_params'] = n_params
+        init_optimizer(self.optimizer)
         self.actor_loss_weight = actor_lr / critic_lr
         self.alpha_optimizer = optim.Adam([self.log_alpha], lr=alpha_lr)
 
@@ -211,10 +207,7 @@ class TrainerBase(ModelBase):
         self.optimizer.zero_grad()
         loss.backward()
         if clip_gradient:
-            for param_group in self.optimizer.param_groups:
-                nn.utils.clip_grad.clip_grad_norm_(param_group['params'],
-                                                   max_norm=0.1 * np.sqrt(param_group['n_params']),
-                                                   norm_type=2)
+            clip_grad_norm(self.optimizer)
         self.optimizer.step()
 
         # Soft update the target value net

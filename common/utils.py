@@ -5,7 +5,9 @@ import os
 import re
 from functools import partial
 
+import numpy as np
 import torch
+import torch.nn as nn
 
 
 CHECKPOINT_FORMAT = '{prefix}epoch({epoch})-reward({reward:+.2E}){suffix}.pkl'
@@ -37,6 +39,25 @@ def sync_params(src_net, dst_net, soft_tau=1.0):
     else:  # 0.0 < soft_tau < 1.0
         for src_param, dst_param in zip(src_net.parameters(), dst_net.parameters()):
             dst_param.data.copy_(dst_param.data * (1.0 - soft_tau) + src_param.data * soft_tau)
+
+
+def init_optimizer(optimizer):
+    for param_group in optimizer.param_groups:
+        n_params = 0
+        for param in param_group['params']:
+            n_params += param.size().numel()
+        param_group['n_params'] = n_params
+
+
+def clip_grad_norm(optimizer, max_norm=None, norm_type=2):
+    for param_group in optimizer.param_groups:
+        max_norm_x = max_norm
+        if max_norm_x is None and 'n_params' in param_group:
+            max_norm_x = 0.1 * np.sqrt(param_group['n_params'])
+        if max_norm_x is not None:
+            nn.utils.clip_grad.clip_grad_norm_(param_group['params'],
+                                               max_norm=max_norm,
+                                               norm_type=norm_type)
 
 
 def check_devices(config):

@@ -10,3 +10,6 @@ class Config(dict):
 
     def build_from_keys(self, keys):
         return Config({key: self[key] for key in keys})
+
+
+Namespace = Config
