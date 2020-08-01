@@ -80,8 +80,8 @@ class Sampler(mp.Process):
         if not self.random_sample:
             self.state_encoder = clone_network(src_net=self.shared_state_encoder, device=self.device)
             self.actor = clone_network(src_net=self.shared_actor, device=self.device)
-            self.state_encoder.eval()
-            self.actor.eval()
+            self.state_encoder.eval().requires_grad_(False)
+            self.actor.eval().requires_grad_(False)
 
         self.episode = 0
         while self.episode < self.n_episodes:

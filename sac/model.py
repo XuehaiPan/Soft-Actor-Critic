@@ -150,7 +150,7 @@ class TrainerBase(ModelBase):
                          devices, random_seed)
 
         self.target_critic = clone_network(src_net=self.critic, device=self.model_device)
-        self.target_critic.eval()
+        self.target_critic.eval().requires_grad_(False)
 
         self.critic_criterion = F.mse_loss
 
@@ -247,7 +247,7 @@ class TrainerBase(ModelBase):
     def load_model(self, path):
         super().load_model(path=path)
         self.target_critic.load_state_dict(self.critic.state_dict())
-        self.target_critic.eval()
+        self.target_critic.eval().requires_grad_(False)
 
 
 class TesterBase(ModelBase):
