@@ -135,8 +135,8 @@ class ModelBase(object):
     def save_model(self, path):
         self.modules.save_model(path)
 
-    def load_model(self, path):
-        self.modules.load_model(path)
+    def load_model(self, path, strict=True):
+        self.modules.load_model(path, strict=strict)
 
 
 class TrainerBase(ModelBase):
@@ -244,8 +244,8 @@ class TrainerBase(ModelBase):
         # size: (batch_size, item_size)
         return state, action, reward, next_state, done
 
-    def load_model(self, path):
-        super().load_model(path=path)
+    def load_model(self, path, strict=True):
+        super().load_model(path=path, strict=strict)
         self.target_critic.load_state_dict(self.critic.state_dict())
         self.target_critic.eval().requires_grad_(False)
 
