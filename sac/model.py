@@ -215,8 +215,12 @@ class TrainerBase(ModelBase):
 
         self.global_step += 1
 
-        info = {}
-        return critic_loss.item(), actor_loss.item(), alpha.item(), info
+        info = {
+            'critic_loss': critic_loss.item(),
+            'actor_loss': actor_loss.item(),
+            'temperature_parameter': alpha.item()
+        }
+        return info
 
     def update(self, batch_size, normalize_rewards=True, reward_scale=1.0,
                adaptive_entropy=True, target_entropy=-2.0,

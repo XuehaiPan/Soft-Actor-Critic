@@ -26,7 +26,7 @@ def train_loop(model, config, update_kwargs):
             mean_episode_steps = 0.0
             with tqdm.trange(config.n_updates, desc=f'Training {epoch}/{config.n_epochs}') as pbar:
                 for i in pbar:
-                    critic_loss, actor_loss, alpha, info = model.update(**update_kwargs)
+                    info = model.update(**update_kwargs)
 
                     n_samples = model.collector.n_total_steps
                     n_episodes = model.collector.n_episodes
@@ -39,15 +39,12 @@ def train_loop(model, config, update_kwargs):
                     recent_slice = slice(max(n_episodes - 100, n_initial_episodes + 1), n_episodes)
                     mean_episode_reward = np.mean(model.collector.episode_rewards[recent_slice])
                     mean_episode_steps = np.mean(model.collector.episode_steps[recent_slice])
-                    epoch_critic_loss += (critic_loss - epoch_critic_loss) / (i + 1)
-                    epoch_actor_loss += (actor_loss - epoch_actor_loss) / (i + 1)
-                    epoch_alpha += (alpha - epoch_alpha) / (i + 1)
-                    writer.add_scalar(tag='train/critic_loss', scalar_value=critic_loss,
-                                      global_step=model.global_step)
-                    writer.add_scalar(tag='train/actor_loss', scalar_value=actor_loss,
-                                      global_step=model.global_step)
-                    writer.add_scalar(tag='train/temperature_parameter', scalar_value=alpha,
-                                      global_step=model.global_step)
+                    epoch_critic_loss += (info['critic_loss'] - epoch_critic_loss) / (i + 1)
+                    epoch_actor_loss += (info['actor_loss'] - epoch_actor_loss) / (i + 1)
+                    epoch_alpha += (info['temperature_parameter'] - epoch_alpha) / (i + 1)
+                    for item in info:
+                        writer.add_scalar(tag=f'train/{item}', scalar_value=info[item],
+                                          global_step=model.global_step)
                     writer.add_scalar(tag='train/mean_episode_reward', scalar_value=mean_episode_reward,
                                       global_step=model.global_step)
                     writer.add_scalar(tag='train/mean_episode_steps', scalar_value=mean_episode_steps,
@@ -71,13 +68,6 @@ def train_loop(model, config, update_kwargs):
             writer.add_scalar(tag='epoch/temperature_parameter', scalar_value=epoch_alpha, global_step=epoch)
             writer.add_scalar(tag='epoch/mean_episode_reward', scalar_value=mean_episode_reward, global_step=epoch)
             writer.add_scalar(tag='epoch/mean_episode_steps', scalar_value=mean_episode_steps, global_step=epoch)
-
-            writer.add_figure(tag='epoch/action_scaler_1',
-                              figure=model.critic.soft_q_net_1.action_scaler.plot(),
-                              global_step=epoch)
-            writer.add_figure(tag='epoch/action_scaler_2',
-                              figure=model.critic.soft_q_net_2.action_scaler.plot(),
-                              global_step=epoch)
 
             writer.flush()
             model.save_model(path=os.path.join(config.checkpoint_dir, 'latest.pkl'))
