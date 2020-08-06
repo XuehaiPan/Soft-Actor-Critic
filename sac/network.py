@@ -42,6 +42,12 @@ class StateEncoderWrapper(Container):
     def reset(self):
         pass
 
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.encoder, name)
+
 
 class DimensionScaler(Container):
     def __init__(self, input_dim, output_dim, device=None):
