@@ -76,7 +76,7 @@ class ModelBase(object):
         self.critic = Critic(state_dim, action_dim, hidden_dims, activation=activation)
         self.actor = Actor(state_dim, action_dim, hidden_dims, activation=activation)
 
-        self.log_alpha = nn.Parameter(torch.tensor([np.log(initial_alpha)], dtype=torch.float32),
+        self.log_alpha = nn.Parameter(torch.tensor(np.log(initial_alpha), dtype=torch.float32),
                                       requires_grad=True)
 
         self.modules = Container()
