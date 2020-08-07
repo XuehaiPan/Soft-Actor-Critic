@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 __all__ = [
@@ -89,7 +88,7 @@ NetworkBase = Container
 
 
 class VanillaNeuralNetwork(NetworkBase):
-    def __init__(self, n_dims, activation=F.relu, output_activation=None, device=None):
+    def __init__(self, n_dims, activation=nn.ReLU(inplace=True), output_activation=None, device=None):
         super().__init__()
 
         self.activation = activation
@@ -174,7 +173,7 @@ cat_hidden = GRUHidden.cat
 class RecurrentNeuralNetwork(NetworkBase):
     def __init__(self, n_dims_before_rnn, n_dims_rnn_hidden, n_dims_after_rnn,
                  skip_connection=False, trainable_initial_hidden=False,
-                 activation=F.relu, output_activation=None, device=None):
+                 activation=nn.ReLU(inplace=True), output_activation=None, device=None):
         assert len(n_dims_rnn_hidden) > 0
 
         super().__init__()
@@ -254,7 +253,7 @@ class ConvolutionalNeuralNetwork(NetworkBase):
     def __init__(self, image_size, input_channels, n_hidden_channels,
                  kernel_sizes, strides, paddings, poolings,
                  output_dim=None, headless=False, batch_normalization=False,
-                 activation=F.relu, output_activation=None, device=None):
+                 activation=nn.ReLU(inplace=True), output_activation=None, device=None):
         assert len(n_hidden_channels) == len(kernel_sizes)
         assert len(n_hidden_channels) == len(strides)
         assert len(n_hidden_channels) == len(paddings)

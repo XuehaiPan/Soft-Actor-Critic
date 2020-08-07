@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.distributions import Normal
 
 from common.network import Container, MultilayerPerceptron
@@ -135,7 +134,7 @@ class DimensionScaler(Container):
 
 
 class ValueNetwork(MultilayerPerceptron):
-    def __init__(self, state_dim, hidden_dims, activation=F.relu, device=None):
+    def __init__(self, state_dim, hidden_dims, activation=nn.ReLU(inplace=True), device=None):
         super().__init__(n_dims=[state_dim, *hidden_dims, 1],
                          activation=activation,
                          output_activation=None)
@@ -149,7 +148,7 @@ class ValueNetwork(MultilayerPerceptron):
 
 
 class SoftQNetwork(MultilayerPerceptron):
-    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None):
+    def __init__(self, state_dim, action_dim, hidden_dims, activation=nn.ReLU(inplace=True), device=None):
         scaled_action_dim = max(state_dim, action_dim)
 
         super().__init__(n_dims=[state_dim + scaled_action_dim, *hidden_dims, 1],
@@ -170,7 +169,7 @@ class SoftQNetwork(MultilayerPerceptron):
 
 
 class PolicyNetwork(MultilayerPerceptron):
-    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None,
+    def __init__(self, state_dim, action_dim, hidden_dims, activation=nn.ReLU(inplace=True), device=None,
                  log_std_min=LOG_STD_MIN, log_std_max=LOG_STD_MAX):
         super().__init__(n_dims=[state_dim, *hidden_dims, 2 * action_dim],
                          activation=activation,
@@ -215,7 +214,7 @@ class PolicyNetwork(MultilayerPerceptron):
 
 
 class Critic(Container):
-    def __init__(self, state_dim, action_dim, hidden_dims, activation=F.relu, device=None):
+    def __init__(self, state_dim, action_dim, hidden_dims, activation=nn.ReLU(inplace=True), device=None):
         super().__init__()
 
         self.state_dim = state_dim

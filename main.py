@@ -9,7 +9,7 @@ import matplotlib as mpl
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-import torch.nn.functional as F
+import torch.nn as nn
 
 from common.config import Config
 from common.environment import initialize_environment
@@ -174,10 +174,12 @@ def initialize(config):
 
 def initialize_hyperparameters(config):
     config.activation = {
-        'ReLU': F.relu, 'LeakyReLU': F.leaky_relu
+        'ReLU': nn.ReLU(inplace=True),
+        'LeakyReLU': nn.LeakyReLU(negative_slope=0.01, inplace=True)
     }.get(config.activation)
     config.encoder_activation = {
-        'ReLU': F.relu, 'LeakyReLU': F.leaky_relu,
+        'ReLU': nn.ReLU(inplace=True),
+        'LeakyReLU': nn.LeakyReLU(negative_slope=0.01, inplace=True),
         None: config.activation
     }.get(config.encoder_activation)
 

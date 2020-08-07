@@ -5,7 +5,6 @@ from functools import partialmethod
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 
 from common.collector import Collector
@@ -152,7 +151,7 @@ class TrainerBase(ModelBase):
         self.target_critic = clone_network(src_net=self.critic, device=self.model_device)
         self.target_critic.eval().requires_grad_(False)
 
-        self.critic_criterion = F.mse_loss
+        self.critic_criterion = nn.MSELoss()
 
         self.global_step = 0
 
