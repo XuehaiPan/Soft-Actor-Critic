@@ -29,7 +29,7 @@ class StateEncoderWrapper(Container):
         self.reset()
 
     def forward(self, *input, **kwargs):
-        return self.encoder.forward(*input, **kwargs)
+        return self.encoder(*input, **kwargs)
 
     @torch.no_grad()
     def encode(self, observation):
@@ -67,7 +67,7 @@ class DimensionScaler(Container):
         self.to(device)
 
     def forward(self, action):
-        return self.scaler.forward(action)
+        return self.scaler(action)
 
     def plot(self):
         input_dim = self.input_dim
@@ -226,8 +226,8 @@ class Critic(Container):
         self.to(device)
 
     def forward(self, state, action):
-        q_value_1 = self.soft_q_net_1.forward(state, action)
-        q_value_2 = self.soft_q_net_2.forward(state, action)
+        q_value_1 = self.soft_q_net_1(state, action)
+        q_value_2 = self.soft_q_net_2(state, action)
         return q_value_1, q_value_2
 
 
