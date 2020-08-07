@@ -69,17 +69,16 @@ class Container(nn.Module):
             self.device = device
         return super().to(*args, **kwargs)
 
-    def save_model(self, path, filter=None):
+    def save_model(self, path, key_filter=None):
         state_dict = self.state_dict()
         keys = list(state_dict.keys())
         for key in keys:
-            if filter is not None and not filter(key):
+            if key_filter is not None and not key_filter(key):
                 state_dict.pop(key)
             else:
                 state_dict[key] = state_dict[key].cpu()
 
         torch.save(state_dict, path)
-
         return state_dict
 
     def load_model(self, path, strict=True):
