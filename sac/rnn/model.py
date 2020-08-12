@@ -1,5 +1,5 @@
 from collections import deque
-from functools import lru_cache, partialmethod
+from functools import lru_cache
 
 import numpy as np
 import torch
@@ -7,16 +7,15 @@ import torch
 from common.collector import EpisodeCollector
 from common.network import cat_hidden
 from .network import StateEncoderWrapper
-from ..model import TrainerBase, TesterBase
+from ..model import Trainer as OriginalTrainer, Tester as OriginalTester
 
 
 __all__ = ['Trainer', 'Tester']
 
 
-class Trainer(TrainerBase):
-    __init__ = partialmethod(TrainerBase.__init__,
-                             state_encoder_wrapper=StateEncoderWrapper,
-                             collector=EpisodeCollector)
+class Trainer(OriginalTrainer):
+    STATE_ENCODER_WRAPPER = StateEncoderWrapper
+    COLLECTOR = EpisodeCollector
 
     def update(self, batch_size, step_size=16,
                normalize_rewards=True, reward_scale=1.0,
@@ -100,7 +99,6 @@ class Trainer(TrainerBase):
         return deque(maxlen=None)
 
 
-class Tester(TesterBase):
-    __init__ = partialmethod(TesterBase.__init__,
-                             state_encoder_wrapper=StateEncoderWrapper,
-                             collector=EpisodeCollector)
+class Tester(OriginalTester):
+    STATE_ENCODER_WRAPPER = StateEncoderWrapper
+    COLLECTOR = EpisodeCollector

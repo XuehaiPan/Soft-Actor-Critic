@@ -1,7 +1,7 @@
 import itertools
 import os
 import time
-from functools import lru_cache, partialmethod
+from functools import lru_cache
 
 import numpy as np
 import torch.multiprocessing as mp
@@ -210,9 +210,12 @@ class EpisodeSampler(Sampler):
         self.replay_buffer.push(*tuple(map(np.stack, zip(*self.trajectory))))
 
 
-class CollectorBase(object):
+class Collector(object):
+    SAMPLER = Sampler
+    REPLAY_BUFFER = ReplayBuffer
+
     def __init__(self, env_func, env_kwargs, state_encoder, actor,
-                 n_samplers, sampler, replay_buffer, buffer_capacity,
+                 n_samplers, buffer_capacity,
                  devices, random_seed):
         self.manager = mp.Manager()
         self.running_event = self.manager.Event()
@@ -227,9 +230,8 @@ class CollectorBase(object):
         self.eval_only = False
 
         self.n_samplers = n_samplers
-        self.sampler = sampler
-        self.replay_buffer = replay_buffer(capacity=buffer_capacity, initializer=self.manager.list,
-                                           Value=self.manager.Value, Lock=self.manager.Lock)
+        self.replay_buffer = self.REPLAY_BUFFER(capacity=buffer_capacity, initializer=self.manager.list,
+                                                Value=self.manager.Value, Lock=self.manager.Lock)
 
         self.env_func = env_func
         self.env_kwargs = env_kwargs
@@ -256,7 +258,7 @@ class CollectorBase(object):
         events[0].set()
 
         for rank in range(self.n_samplers):
-            sampler = self.sampler(rank, self.n_samplers, self.lock,
+            sampler = self.SAMPLER(rank, self.n_samplers, self.lock,
                                    self.running_event, events[rank], events[(rank + 1) % self.n_samplers],
                                    self.env_func, self.env_kwargs, self.state_encoder, self.actor,
                                    self.eval_only, self.replay_buffer,
@@ -319,13 +321,6 @@ class CollectorBase(object):
         return self.train(mode=False)
 
 
-class Collector(CollectorBase):
-    __init__ = partialmethod(CollectorBase.__init__,
-                             sampler=Sampler,
-                             replay_buffer=ReplayBuffer)
-
-
-class EpisodeCollector(CollectorBase):
-    __init__ = partialmethod(CollectorBase.__init__,
-                             sampler=EpisodeSampler,
-                             replay_buffer=EpisodeReplayBuffer)
+class EpisodeCollector(Collector):
+    SAMPLER = EpisodeSampler
+    REPLAY_BUFFER = EpisodeReplayBuffer

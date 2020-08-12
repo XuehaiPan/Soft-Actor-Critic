@@ -1,6 +1,5 @@
 import itertools
 import os
-from functools import partialmethod
 
 import numpy as np
 import torch
@@ -13,7 +12,7 @@ from common.utils import clone_network, sync_params, init_optimizer, clip_grad_n
 from .network import StateEncoderWrapper, Actor, Critic
 
 
-__all__ = ['build_model', 'TrainerBase', 'TesterBase', 'Trainer', 'Tester']
+__all__ = ['build_model', 'Trainer', 'Tester']
 
 
 def build_model(config):
@@ -58,9 +57,12 @@ def build_model(config):
 
 
 class ModelBase(object):
-    def __init__(self, env_func, env_kwargs, state_encoder, state_encoder_wrapper,
+    STATE_ENCODER_WRAPPER = StateEncoderWrapper
+    COLLECTOR = Collector
+
+    def __init__(self, env_func, env_kwargs, state_encoder,
                  state_dim, action_dim, hidden_dims, activation,
-                 initial_alpha, n_samplers, collector, buffer_capacity,
+                 initial_alpha, n_samplers, buffer_capacity,
                  devices, random_seed=0):
         self.devices = itertools.cycle(devices)
         self.model_device = next(self.devices)
@@ -70,7 +72,7 @@ class ModelBase(object):
 
         self.training = True
 
-        self.state_encoder = state_encoder_wrapper(state_encoder)
+        self.state_encoder = self.STATE_ENCODER_WRAPPER(state_encoder)
 
         self.critic = Critic(state_dim, action_dim, hidden_dims, activation=activation)
         self.actor = Actor(state_dim, action_dim, hidden_dims, activation=activation)
@@ -87,14 +89,14 @@ class ModelBase(object):
 
         self.state_encoder.share_memory()
         self.actor.share_memory()
-        self.collector = collector(env_func=env_func,
-                                   env_kwargs=env_kwargs,
-                                   state_encoder=self.state_encoder,
-                                   actor=self.actor,
-                                   n_samplers=n_samplers,
-                                   buffer_capacity=buffer_capacity,
-                                   devices=self.devices,
-                                   random_seed=random_seed)
+        self.collector = self.COLLECTOR(env_func=env_func,
+                                        env_kwargs=env_kwargs,
+                                        state_encoder=self.state_encoder,
+                                        actor=self.actor,
+                                        n_samplers=n_samplers,
+                                        buffer_capacity=buffer_capacity,
+                                        devices=self.devices,
+                                        random_seed=random_seed)
 
     def print_info(self, file=None):
         print(f'state_dim = {self.state_dim}', file=file)
@@ -138,14 +140,14 @@ class ModelBase(object):
         self.modules.load_model(path, strict=strict)
 
 
-class TrainerBase(ModelBase):
-    def __init__(self, env_func, env_kwargs, state_encoder, state_encoder_wrapper,
+class Trainer(ModelBase):
+    def __init__(self, env_func, env_kwargs, state_encoder,
                  state_dim, action_dim, hidden_dims, activation,
                  initial_alpha, critic_lr, actor_lr, alpha_lr, weight_decay,
-                 n_samplers, collector, buffer_capacity, devices, random_seed=0):
-        super().__init__(env_func, env_kwargs, state_encoder, state_encoder_wrapper,
+                 n_samplers, buffer_capacity, devices, random_seed=0):
+        super().__init__(env_func, env_kwargs, state_encoder,
                          state_dim, action_dim, hidden_dims, activation,
-                         initial_alpha, n_samplers, collector, buffer_capacity,
+                         initial_alpha, n_samplers, buffer_capacity,
                          devices, random_seed)
 
         self.target_critic = clone_network(src_net=self.critic, device=self.model_device)
@@ -253,20 +255,9 @@ class TrainerBase(ModelBase):
         self.target_critic.eval().requires_grad_(False)
 
 
-class TesterBase(ModelBase):
+class Tester(ModelBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.eval()
-
-
-class Trainer(TrainerBase):
-    __init__ = partialmethod(TrainerBase.__init__,
-                             state_encoder_wrapper=StateEncoderWrapper,
-                             collector=Collector)
-
-
-class Tester(TesterBase):
-    __init__ = partialmethod(TesterBase.__init__,
-                             state_encoder_wrapper=StateEncoderWrapper,
-                             collector=Collector)
+        self.modules.requires_grad_(False)
