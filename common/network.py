@@ -290,9 +290,7 @@ class ConvolutionalNeuralNetwork(NetworkBase):
 
         dummy = torch.zeros(1, input_channels, *image_size)
         with torch.no_grad():
-            for conv_layer, max_pooling_layer in zip(self.conv_layers, self.max_pooling_layers):
-                dummy = conv_layer(dummy)
-                dummy = max_pooling_layer(dummy)
+            dummy = self(dummy)
         conv_output_dim = int(np.prod(dummy.size()))
 
         if output_dim is not None:
